@@ -1,0 +1,31 @@
+{
+  "name": "soberania",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node --test --test-isolation=none tests/*.test.js",
+    "format": "prettier --write src tests/*.js index.html package.json README.md",
+    "format:check": "prettier --check src tests/*.js index.html package.json README.md"
+  },
+  "dependencies": {
+    "@fontsource-variable/dm-sans": "^5.2.6",
+    "@fontsource-variable/manrope": "^5.2.8",
+    "d3-geo": "3.1.1",
+    "lucide-react": "0.468.0",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "topojson-client": "3.1.0"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "vite": "6.4.1",
+    "world-atlas": "2.0.2"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}
