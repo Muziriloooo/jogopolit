@@ -36,6 +36,7 @@ import {
 import type { Order, User, RecordOrder, Visit, Part } from './types';
 import { api, load, save, session, clearDevice, compress } from './store';
 import { report, money, date } from './pdf';
+import { watchUpdates } from './updates';
 import './styles.css';
 const uid = () => crypto.randomUUID();
 const day = () => new Date().toLocaleDateString('en-CA');
@@ -67,6 +68,8 @@ function App() {
   const [online, setOnline] = useState(navigator.onLine);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  const [updateWaiting, setUpdateWaiting] = useState(false);
+  const updateSafe = useRef<() => boolean>(() => false);
   const [page, setPage] = useState('overview');
   const [selected, setSelected] = useState<string>();
   const [tab, setTab] = useState('Resumo');
@@ -183,6 +186,32 @@ function App() {
       return () => clearInterval(timer);
     }
   }, [user?.id, online]);
+  // Resume promptly when a phone returns from the lock screen or another app.
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState !== 'hidden') void sync();
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [user?.id, online]);
+  // Send completed local edits promptly; the regular poll still fetches remote edits.
+  useEffect(() => {
+    if (!user || !online || !orders.some((r) => r.pending && !r.error)) return;
+    const timer = setTimeout(() => void sync(), 2000);
+    return () => clearTimeout(timer);
+  }, [orders, user?.id, online]);
+  useEffect(() => {
+    if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
+    return watchUpdates({
+      safeToReload: () => updateSafe.current(),
+      flush: () => localWrites.current,
+      onWaiting: setUpdateWaiting,
+    });
+  }, []);
   function update(data: Order) {
     if (!user) return;
     const old = ordersRef.current.find((r) => r.data.id === data.id);
@@ -221,6 +250,15 @@ function App() {
   const current = orders.find((r) => r.data.id === selected);
   const pending = orders.filter((x) => x.pending).length;
   const activeVisit = current?.data.visits.find((v) => !v.checkOut);
+  updateSafe.current = () =>
+    !boot &&
+    !syncLock.current &&
+    !ordersRef.current.some((r) => r.pending) &&
+    !activeVisit &&
+    !modal &&
+    !userModal &&
+    !(selected && ['Peças', 'Atendimento'].includes(tab)) &&
+    !document.activeElement?.matches('input, textarea, select, canvas, [contenteditable="true"]');
   const list = orders.filter(
     ({ data: o }) =>
       (filter === 'Todas' || o.status === filter) &&
@@ -397,6 +435,15 @@ function App() {
           </div>
         </header>
         <main>
+          {updateWaiting && (
+            <div className="notice" role="status">
+              <RefreshCw size={18} />
+              <span>
+                Nova versão pronta. A atualização será aplicada automaticamente quando você terminar
+                o preenchimento e os dados estiverem sincronizados.
+              </span>
+            </div>
+          )}
           {notice && (
             <div className="notice" role="status">
               <AlertCircle size={18} />
@@ -2562,7 +2609,3 @@ function Metrics({ orders, cost }: { orders: Order[]; cost: (o: Order) => number
   );
 }
 createRoot(document.getElementById('root')!).render(<App />);
-if ('serviceWorker' in navigator && import.meta.env.PROD)
-  window.addEventListener('load', () =>
-    navigator.serviceWorker.register('/sw.js').catch(console.error),
-  );

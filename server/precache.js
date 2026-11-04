@@ -8,8 +8,11 @@ const files = [
   '/icon-512.png',
   ...(await fs.readdir('dist/assets')).map((f) => '/assets/' + f),
 ];
-const version = createHash('sha256').update(files.join(',')).digest('hex').slice(0, 12);
 let sw = await fs.readFile('public/sw.js', 'utf8');
+const digest = createHash('sha256').update(sw);
+for (const file of files)
+  digest.update(await fs.readFile(file === '/' ? 'dist/index.html' : 'dist' + file));
+const version = digest.digest('hex').slice(0, 12);
 sw = sw
   .replace(/const CACHE\s*=\s*["']sl-campo-v1["'];/, `const CACHE='sl-campo-${version}';`)
   .replace(/c\.addAll\(\s*\[[\s\S]*?\]\s*\)/, `c.addAll(${JSON.stringify(files)})`);

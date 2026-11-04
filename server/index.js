@@ -4,8 +4,25 @@ import express from 'express';
 import path from 'node:path';
 const app = await createApp(await database());
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.resolve('dist'), { index: false }));
-  app.get('/{*path}', (req, res) => res.sendFile(path.resolve('dist/index.html')));
+  app.use(
+    express.static(path.resolve('dist'), {
+      index: false,
+      setHeaders(res, file) {
+        if (
+          file.endsWith('sw.js') ||
+          file.endsWith('index.html') ||
+          file.endsWith('manifest.webmanifest')
+        )
+          res.setHeader('Cache-Control', 'no-cache');
+        else if (file.includes(path.sep + 'assets' + path.sep))
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      },
+    }),
+  );
+  app.get('/{*path}', (req, res) => {
+    res.set('Cache-Control', 'no-cache');
+    res.sendFile(path.resolve('dist/index.html'));
+  });
 }
 app.listen(Number(process.env.PORT || 3001), process.env.HOST || '127.0.0.1', () =>
   console.log('SL Campo API pronta na porta ' + (process.env.PORT || 3001)),

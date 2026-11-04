@@ -86,3 +86,23 @@ PGlite local: pare a API antes de copiar `.data/postgres` integralmente; restaur
 - `tests/`: regras, API e fluxo real de navegador.
 
 Não há logotipos oficiais incorporados; substitua a marca tipográfica apenas com arquivos autorizados.
+
+## Atualização automática no computador e no celular
+
+Ambos precisam acessar **o mesmo endereço HTTPS da mesma instalação**, com a mesma API e banco. Uma cópia local em cada dispositivo não compartilha dados automaticamente.
+
+### Dados da operação
+
+Registros são salvos primeiro no dispositivo. Alterações são enviadas após aproximadamente 2 segundos sem novas edições, quando há conexão. Ordens alteradas em outro dispositivo são consultadas a cada 15 segundos e ao voltar para a janela/aplicativo. Rascunhos locais têm prioridade até sincronizar; conflitos entre dispositivos continuam exigindo revisão, sem sobrescrita silenciosa. Sem conexão, tudo permanece na fila.
+
+### Novas versões do aplicativo
+
+Após publicar um novo build no **mesmo endereço**, o PWA verifica versões ao iniciar, reconectar, voltar ao aplicativo e a cada minuto enquanto estiver visível. A versão é identificada pelo conteúdo completo do build e do service worker; mudanças apenas de HTML ou do próprio service worker também são detectadas.
+
+A nova versão é baixada em segundo plano. O recarregamento automático só acontece quando não há dados pendentes, sincronização em andamento, visita aberta na tela, formulário de peças/atendimento, modal aberto ou campo em edição. O aviso “Nova versão pronta” informa que a atualização está aguardando. Finalize o preenchimento, sincronize e volte ao Resumo ou à tela inicial para permitir a atualização. O IndexedDB e o banco não são apagados. Em múltiplas abas, uma atualização ativada por outra aba também respeita as condições de segurança de cada tela.
+
+**Primeira implantação deste mecanismo:** quem ainda estiver usando a versão antiga precisa fechar todas as janelas do PWA e abrir novamente com internet, ou atualizar a página uma vez. Depois que essa versão estiver instalada, as próximas atualizações seguem o fluxo automático. O sistema operacional pode suspender um aplicativo fechado; a verificação volta a ocorrer quando ele for aberto.
+
+Alterar arquivos no computador ou enviar ao GitHub não altera, por si só, o site publicado. A hospedagem precisa executar `npm ci`, `npm run build`, publicar o diretório `dist` e reiniciar a API quando necessário, preservando o banco e as variáveis de ambiente. É possível automatizar isso com o deploy da hospedagem ligado à branch `main`; a configuração exata depende do provedor. Não publique `.env`, `.data` ou cópias do banco no repositório. O servidor Node já envia políticas de cache adequadas para HTML/service worker e assets versionados; mantenha essas políticas em qualquer CDN/proxy.
+
+Para verificar releases de PWA sem depender de hospedagem externa, execute `npm run build` e `python3 tests/updates.py`. O teste usa service workers reais no Chromium e verifica instalação inicial, atualização em repouso, proteção de campos em edição, rascunhos no IndexedDB e ativação por outra aba.
