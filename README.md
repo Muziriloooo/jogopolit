@@ -23,6 +23,16 @@ Na primeira inicialização demonstrativa são criadas três contas com a senha 
 
 Os usuários de exemplo são fictícios. A seed contém somente a OS 41250 anonimizada. Contas não são recriadas se o banco já tiver usuários. Mudar `DEMO_PASSWORD` após o primeiro boot não altera as senhas existentes.
 
+## Iniciar no Windows
+
+Instale o **Node.js 24 ou superior**, com npm, e dê dois cliques em `iniciar.bat` na pasta do projeto. Também é possível executá-lo pelo Prompt de Comando. Mantenha a janela aberta enquanto usar o sistema; `Ctrl+C` encerra os serviços.
+
+O arquivo verifica o Node, instala dependências com `npm ci` na primeira execução e quando o lockfile mudar, e inicia a API e a interface. Aguarde o Vite informar o endereço no terminal e abra-o no navegador (porta padrão 5173). A primeira instalação exige internet. Não é necessário instalar PostgreSQL para a demonstração local.
+
+Se `.env` não existir, o iniciador cria uma configuração **somente para demonstração local**, usando as três contas listadas acima e a senha pública `Campo-demo-2026!`. Se `.env` já existir, ele é preservado. O banco `.data` também é preservado; senhas de usuários já cadastrados não são alteradas pelo iniciador. Para reinstalar as dependências manualmente, remova somente `node_modules/.sl-campo-lock` e execute novamente.
+
+O iniciador executa o modo de desenvolvimento. Para instalar e testar o PWA ou publicar em HTTPS, siga as seções abaixo. O arquivo foi revisado neste ambiente Linux; a execução no Windows ainda precisa ser validada.
+
 ## Testes e PWA
 
 ```sh
