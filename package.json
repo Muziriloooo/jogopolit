@@ -1,31 +1,40 @@
 {
-  "name": "soberania",
+  "name": "sl-campo",
   "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0",
+    "dev": "concurrently -k \"npm:server\" \"npm:client\"",
+    "server": "node --env-file-if-exists=.env server/index.js",
+    "client": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build && node server/precache.js",
+    "start": "NODE_ENV=production node --env-file-if-exists=.env server/index.js",
     "test": "node --test --test-isolation=none tests/*.test.js",
-    "format": "prettier --write src tests/*.js index.html package.json README.md",
-    "format:check": "prettier --check src tests/*.js index.html package.json README.md"
+    "test:browser": "python3 tests/browser.py",
+    "preview": "vite preview --host 0.0.0.0",
+    "format": "prettier --write src server tests/*.js public/*.js public/*.webmanifest *.json *.ts *.html README.md docs/*.md",
+    "format:check": "prettier --check src server tests/*.js public/*.js public/*.webmanifest *.json *.ts *.html README.md docs/*.md"
   },
   "dependencies": {
-    "@fontsource-variable/dm-sans": "^5.2.6",
-    "@fontsource-variable/manrope": "^5.2.8",
-    "d3-geo": "3.1.1",
-    "lucide-react": "0.468.0",
-    "react": "19.1.1",
-    "react-dom": "19.1.1",
-    "topojson-client": "3.1.0"
+    "@electric-sql/pglite": "^0.3.14",
+    "bcryptjs": "^3.0.2",
+    "concurrently": "^9.2.1",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "helmet": "^8.1.0",
+    "idb": "^8.0.3",
+    "jspdf": "^3.0.3",
+    "lucide-react": "^0.468.0",
+    "pg": "^8.16.3",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
-    "prettier": "^3.6.2",
-    "vite": "6.4.1",
-    "world-atlas": "2.0.2"
-  },
-  "engines": {
-    "node": ">=24.0.0"
+    "@types/react": "^19.1.16",
+    "@types/react-dom": "^19.1.9",
+    "prettier": "^3.9.10",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.1"
   }
 }

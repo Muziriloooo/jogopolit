@@ -1,87 +1,78 @@
-# Soberania
+# SL Campo
 
-Simulador político e geopolítico em português, inspirado nas ideias de gestão presidencial e estratégia internacional descritas para Planalto e Geoplanetical. Interface, regras, personagens e implementação próprios.
+Sistema de manutenção com foco no atendimento pelo celular. Código React/TypeScript, API Node, PostgreSQL, laudos, fotos, assinatura, dois PDFs e persistência offline. Leia [arquitetura e limites](docs/ARQUITETURA.md).
 
-## Executar
+## Desenvolvimento
 
-Requer Node.js 24 ou superior e npm. A versão do Node está indicada em `.nvmrc`.
+Requer Node.js 24+, npm. Use o checkout existente; não precisa criar worktree.
 
-```bash
+```sh
 npm ci
+cp .env.example .env
+# Edite .env: DEMO_MODE=true e DEMO_PASSWORD com 12+ caracteres.
 npm run dev
 ```
 
-O Vite informa o endereço e a porta no terminal. A porta padrão é 5173. Para gerar a versão de produção:
+Vite: porta 5173, API: porta 3001. O motor PostgreSQL embarcado inicializa em `.data/postgres`. Não apague `.data` para atualizar dependências. As tabelas são criadas automaticamente de modo idempotente.
 
-```bash
-npm run build
-npm run preview
-```
+Na primeira inicialização demonstrativa são criadas três contas com a senha configurada em `DEMO_PASSWORD`:
 
-O conteúdo de `dist/` pode ser servido por qualquer hospedagem estática na raiz de um domínio. Não há servidor de aplicação, banco de dados, chaves de API ou serviços pagos necessários. Fontes e geometria do mapa são distribuídas localmente.
+- `tecnico@slcampo.local`: Lucas Ferreira, técnico.
+- `gestor@slcampo.local`: Marina Costa, gestor.
+- `admin@slcampo.local`: administrador.
 
-## Como jogar
+Os usuários de exemplo são fictícios. A seed contém somente a OS 41250 anonimizada. Contas não são recriadas se o banco já tiver usuários. Mudar `DEMO_PASSWORD` após o primeiro boot não altera as senhas existentes.
 
-1. O jogo abre com um governo do Brasil em janeiro de 2026. Clique no país na barra lateral para iniciar com outro dos 16 países disponíveis e definir seu nome.
-2. Resolva a situação urgente em **Na sua mesa**. Essas respostas custam recursos, quando indicado, mas não consomem uma das três decisões do mês.
-3. Use suas decisões para implementar medidas, negociar votos, construir obras, pesquisar tecnologias ou agir no exterior.
-4. Clique em **Avançar mês**. Receitas e despesas são processadas, a economia evolui, obras e pesquisas progridem e o Legislativo vota projetos.
-5. Consulte **Meu legado** para acompanhar resultados e conquistas. A cada 48 meses há uma eleição: aprovação ≥45 e estabilidade ≥30 renovam o mandato; do contrário, o governo termina. Aprovação <15 com estabilidade <25 provoca destituição.
+## Testes e PWA
 
-**Salvamento:** automático no armazenamento local do navegador. A engrenagem junto ao perfil permite exportar e importar um JSON validado. Limpar os dados do navegador remove o salvamento; exporte uma cópia para transferir ou arquivar uma partida. Começar um novo governo exige uma ação explícita e substitui a partida atual.
-
-## Sistemas implementados
-
-- **16 países jogáveis**, cada um com parâmetros econômicos, população, capital e tamanho do Legislativo próprios. O globo ortográfico é arrastável, tem zoom e exibe 177 geometrias do mapa mundial, com camadas política, econômica e diplomática.
-- **Governo:** três decisões por mês, capital político, quatro ministérios com perfis técnicos ou de articulação, políticas públicas, compromissos e registro das decisões.
-- **Economia:** PIB, crescimento, inflação, desemprego, caixa, dívida, impostos, juros e distribuição do orçamento entre seis setores. Gastos, dívida, conflitos e comércio se influenciam.
-- **Congresso:** bancadas fictícias, negociação, votações nas duas casas quando presentes, maioria absoluta para leis e duas rodadas com quórum de 3/5 para a reforma institucional. No Brasil, são 513 deputados e 81 senadores. O resultado dos votos tem incerteza reproduzível.
-- **Desenvolvimento:** oito tipos de obras, escolha de região, custos iniciais, prazos e benefícios na conclusão. O centro espacial depende de pesquisa prévia.
-- **Diplomacia:** missões, tratados comerciais, alianças, sanções, conflitos e paz. Outros países têm crescimento econômico e relações que evoluem por turno.
-- **Defesa e inteligência:** modernização das forças, análises de tensão e conflitos abstratos com custo mensal, desgaste militar e consequências internas.
-- **Pesquisa:** 57 avanços em 19 áreas, requisitos científicos, até duas pesquisas simultâneas e três níveis por área. Inclui satélites, missão e habitat lunares e fusão nuclear.
-- **Eventos e imprensa:** cinco tipos de crises, três respostas por evento, consequências imediatas, notícias ligadas às ações e histórico econômico de até 120 meses.
-- **Legado:** pontuação, seis conquistas, eleições e continuidade entre mandatos enquanto o governo conserva apoio.
-
-## Modelo e limites desta versão
-
-É um jogo individual local. Não há multiplayer, contas, ranking online ou integração com os jogos de referência. Os dados iniciais são parâmetros fictícios de balanceamento, não estatísticas oficiais. Países usam uma estrutura institucional simplificada comum e partidos e ministros fictícios. Valores monetários estão em bilhões de dólares simulados; os custos de decisões são proporcionais ao tamanho inicial da economia.
-
-O campo de proposta livre identifica temas por regras locais e sugere uma medida predefinida para confirmação. **Não usa IA generativa** e não interpreta valores, negações, prazos ou políticas arbitrárias. A descrição e os efeitos da medida sugerida são exibidos antes de gastar recursos.
-
-A economia usa um modelo simplificado: receita mensal proporcional ao PIB e à carga tributária; despesas de serviços proporcionais ao PIB; custo de juros proporcional à dívida; custos recorrentes por guerra. Crescimento afeta PIB e emprego, juros afetam inflação, investimentos afetam serviços e aprovação. Uma insuficiência de caixa mensal gera dívida. A diplomacia internacional automatizada se limita à evolução econômica e das relações, sem governos adversários que planejem guerras ou eleições autonomamente.
-
-Conflitos não incluem combate tático ou conquista territorial. A exploração espacial é representada por pesquisa e infraestrutura, sem administração de colônias. A única reforma constitucional disponível fortalece a fiscalização institucional; não altera a duração dos mandatos nem o sistema eleitoral.
-
-## Verificação
-
-```bash
+```sh
 npm test
 npm run build
-npm run format:check
+npm run preview
+# Com a API ainda em execução, testa build com service worker na porta 4173.
 ```
 
-Os testes do motor cobrem recursos e imutabilidade, crise e passagem de turnos, prazos de obras, pesquisa, quóruns legislativos, orçamento, dívida, diplomacia, guerra e paz, eleições, determinismo, salvamentos e uma simulação de dez anos.
+`npm test` executa domínio e API em banco isolado. Para os testes do navegador, use um banco demonstrativo de teste, `DEMO_PASSWORD=Campo-demo-2026!`, Chromium em `/usr/bin/chromium`, Python e Playwright (`python3 -m pip install playwright`). Os testes criam OS fictícias adicionais.
 
-Existe também uma verificação funcional opcional em Python com Playwright e Chromium. Com o jogo em execução:
-
-```bash
-python3 -m pip install playwright
-CHROMIUM_PATH=/usr/bin/chromium python3 tests/browser_smoke.py
+```sh
+npm run test:browser
+SL_URL=http://127.0.0.1:4173 SL_OFFLINE=1 python3 tests/browser.py
 ```
 
-`SOBERANIA_URL` permite apontar para outro endereço de teste. O script percorre os dez painéis em desktop e celular, executa decisões, verifica exportação/importação, persistência e uso de teclado nos diálogos. Capturas ficam em `test-results/`, ignorado pelo Git. Se seu Chromium estiver em outro local, ajuste `CHROMIUM_PATH`.
+Capturas e PDF ficam em `test-results/` (ignorado). Os testes não alteram a OS de referência. Para homologar em aparelhos reais, publique sob HTTPS e valide Chrome Android e Safari iOS. Instale pelo menu do navegador (Android) ou Compartilhar → Adicionar à Tela de Início (iOS). Primeira abertura e sincronização exigem conexão.
 
-## Organização
+## Fluxo de uso
 
-- `src/engine.js`: regras puras, evolução mensal, validação de partidas e gerador pseudoaleatório persistente.
-- `src/data.js`: países, políticas, obras, eventos, ministérios e tecnologias.
-- `src/App.jsx`: navegação, salvamento, diálogos e fluxo de decisões.
-- `src/views.jsx`: dez painéis de governo.
-- `src/components.jsx`: globo, gráficos, componentes e controles acessíveis.
-- `src/styles.css`: identidade visual e adaptação para celular.
-- `tests/`: verificações do motor e do navegador.
+1. Gestor cria OS e atribui técnico; sincroniza.
+2. Técnico entra e sincroniza ordens; abre OS e inicia atendimento.
+3. Confere equipamento, registra laudo, fotos, solicitações na aba Peças e assinatura ou justificativa.
+4. Finaliza a visita e baixa os documentos. A OS permanece aberta.
+5. Gestor aprova e registra entrega. Em nova visita, técnico instala peças entregues e registra resultados.
+6. Gestor encerra a OS sem pendências. Para conflito de edição, exporte o rascunho antes de carregar a versão do servidor.
 
-## Créditos
+## Publicação
 
-Geometria do mapa: [world-atlas](https://github.com/topojson/world-atlas), baseada no Natural Earth (dados em domínio público); a transformação e distribuição world-atlas usa licença ISC. Ícones: Lucide (ISC). Fontes: DM Sans e Manrope, via Fontsource, sob SIL Open Font License. Veja `public/THIRD_PARTY_NOTICES.txt`. Nenhum recurso visual dos jogos de referência foi copiado.
+1. Provisione PostgreSQL 15+ e um usuário de migração. Execute `server/schema.sql` com o proprietário. Crie um papel API com senha própria e permissões SELECT/INSERT/UPDATE/DELETE nas tabelas e USAGE/SELECT nas sequências; sem SUPERUSER, propriedade das tabelas ou BYPASSRLS. Não exponha PostgreSQL na internet sem restrições. O bootstrap de schema é idempotente; em instalações com papel restrito, aplique migrações separadamente e configure `SKIP_SCHEMA=true` para o processo de aplicação.
+2. Configure as variáveis de `.env.example`: `DATABASE_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` (12+), `DEMO_MODE=false`, `COOKIE_SECURE=true`, `NODE_ENV=production`. O primeiro boot cria só o administrador. Não reutilize banco ou contas da demonstração.
+3. Execute `npm ci`, `npm run build` e `npm start`. A API serve os arquivos estáticos e fallback SPA. Porta padrão 3001, bind local. Use proxy reverso HTTPS no mesmo domínio para interface/API; `HOST=0.0.0.0` somente se necessário em rede privada de containers.
+4. Desative o cache do proxy para `/api/*` e `/sw.js`. Preserve cookies e `Content-Type`. Limite de corpo deve aceitar 28 MB; mantenha timeout adequado para rede móvel. Ative compressão HTTP. Não coloque segredos em variáveis `VITE_*`.
+5. Entre com administrador, crie contas individuais em Equipe técnica e atribua OS. Não há convite por e-mail ou troca/recuperação de senha na interface nesta versão; defina processo administrativo antes da operação real.
+
+### Backup
+
+PostgreSQL externo: programe `pg_dump --format=custom` com credenciais seguras, criptografe e copie para armazenamento privado, retenção aprovada e restauração periódica em banco isolado com `pg_restore`. Inclui fotos e assinaturas, pois estão no banco. Habilite backups/PITR do provedor quando disponível. Não há job de backup automático embutido.
+
+PGlite local: pare a API antes de copiar `.data/postgres` integralmente; restaure com processo parado. Exportação JSON em Configurações é cópia dos registros disponíveis à conta, não backup completo do servidor. Mantenha os arquivos exportados privados.
+
+## Estrutura
+
+- `src/main.tsx`: navegação, gestão, atendimento por etapas, fotos e assinatura.
+- `src/store.ts`: IndexedDB, compressão e cliente API.
+- `src/pdf.ts`: OS e relatório técnico, paginação, fotos e assinatura.
+- `server/app.js`: autenticação, permissões, sincronização transacional e auditoria.
+- `server/domain.js`: schema e regras de fluxo.
+- `server/schema.sql`: tabelas e RLS.
+- `public/sw.js` / `server/precache.js`: cache de build para offline.
+- `tests/`: regras, API e fluxo real de navegador.
+
+Não há logotipos oficiais incorporados; substitua a marca tipográfica apenas com arquivos autorizados.
