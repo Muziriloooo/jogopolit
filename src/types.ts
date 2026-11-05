@@ -75,4 +75,6 @@ export type RecordOrder = {
   pending?: boolean;
   commandId?: string;
   error?: string;
+  baseData?: Order;
+  inFlight?: { commandId: string; baseRevision: number; data: Order };
 };

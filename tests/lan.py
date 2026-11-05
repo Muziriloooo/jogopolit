@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory() as tmp:
    # insecure HTTP origin (no randomUUID/service worker). Never contact a user's PC.
    if not os.environ.get('SL_LAN_DIRECT'):
     prefix=f'http://{LAN}:{PORT}'
-    mobile.route(prefix+'/**',lambda route:route.fulfill(response=route.fetch(url=route.request.url.replace(prefix,f'http://127.0.0.1:{PORT}',1))))
+    mobile.route(prefix+'/**',lambda route:route.abort() if route.request.url.endswith('/api/events') else route.fulfill(response=route.fetch(url=route.request.url.replace(prefix,f'http://127.0.0.1:{PORT}',1))))
    computer=desktop.new_page();phone=mobile.new_page();errors=[]
    for page in [computer,phone]:page.on('pageerror',lambda e:(errors.append(str(e)),print('JS ERROR:',str(e))))
    def login(page,url,email):
@@ -49,10 +49,18 @@ with tempfile.TemporaryDirectory() as tmp:
    expect(phone.get_by_role('button',name=ORDER)).to_be_visible(timeout=25000)
    phone.get_by_role('button',name=ORDER).click();phone.get_by_role('button',name='INICIAR ATENDIMENTO',exact=True).click();expect(phone.get_by_text('Check-in registrado',exact=True)).to_be_visible()
    phone.get_by_role('button',name='Continuar',exact=True).click();phone.get_by_label('Diagnóstico técnico *',exact=True).fill('Laudo LAN preservado')
+   # Data must also reach the desktop while both pages stay open.
+   expect(computer.get_by_text('Visita 1 · Em andamento',exact=True)).to_be_visible(timeout=10000)
+   computer.locator('.detail-tabs').get_by_role('button',name='Atendimento',exact=True).click()
+   computer.get_by_role('button',name='Continuar',exact=True).click()
+   expect(computer.get_by_label('Diagnóstico técnico *',exact=True)).to_have_value('Laudo LAN preservado',timeout=10000)
+   computer.get_by_label('Verificações mecânicas e resultados',exact=True).fill('Atualização do computador pela API')
+   expect(phone.get_by_label('Verificações mecânicas e resultados',exact=True)).to_have_value('Atualização do computador pela API',timeout=10000)
+   computer.locator('.detail-tabs').get_by_role('button',name='Resumo',exact=True).click()
    phone.evaluate('window.lanMarker="active-visit"');computer.evaluate('window.lanMarker="desktop"')
    # A change to the source on the computer is served automatically to both origins.
    (folder/'src/main.tsx').write_text((folder/'src/main.tsx').read_text()+'\n/* LAN release test */\n')
-   computer.get_by_role('heading',name='Ordem de serviço').click()
+   computer.get_by_role('button',name='Voltar para as ordens').click();computer.get_by_role('heading',name='Olá,').click()
    computer.wait_for_function('window.lanMarker===undefined',timeout=15000)
    expect(phone.get_by_text('Nova versão pronta.',exact=False)).to_be_visible(timeout=15000)
    assert phone.evaluate('window.lanMarker')=='active-visit'

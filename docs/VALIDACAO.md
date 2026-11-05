@@ -3,7 +3,7 @@
 Validação nesta instância em 04/11/2026:
 
 - `npm ci --cache /workspace/.cache/npm --no-audit --no-fund --offline`: instalação limpa pelo lockfile, 155 pacotes (antes da inclusão da ferramenta Prettier). A primeira tentativa foi interrompida pela sandbox na validação do binário esbuild; a execução autorizada concluiu sem desabilitar verificações. Prettier foi instalado posteriormente pelo npm com atualização do lockfile.
-- `npm test`: 11 testes passaram, 0 falhas e 0 ignorados. A integração usa PGlite em memória e papel SQL sem propriedade/superusuário para testar RLS. Inclui sessão, ausência de preços para técnicos, isolamento entre técnicos, retransmissão idempotente, conflito de revisão, auditoria e aprovação → entrega → instalação em visita de retorno → check-out. Domínio cobre valores reais da referência, imutabilidade, justificativas e validação de anexos.
+- `npm test`: 17 testes passaram, 0 falhas e 0 ignorados. A integração usa PGlite em memória e papel SQL sem propriedade/superusuário para testar RLS. Inclui sessão, ausência de preços para técnicos, isolamento entre técnicos, retransmissão idempotente, conflito de revisão, auditoria e aprovação → entrega → instalação em visita de retorno → check-out. Domínio cobre valores reais da referência, imutabilidade, justificativas e validação de anexos.
 - `npm run build`: TypeScript e Vite concluídos; precache do service worker gerado com 11 arquivos. Há aviso de bundle principal maior que 500 kB (aproximadamente 221 kB gzip); não impede build.
 - `npm run format:check`: formatação validada.
 - `python3 tests/browser.py`: Chromium desktop 1440×1000 e móvel 390×844; cadastro/atribuição pelo gestor, atendimento pelo técnico, laudo, compressão de foto, assinatura desenhada, saída, PDF e sincronização. Zero erros de JavaScript e sem transbordamento horizontal na tela verificada.
@@ -17,3 +17,11 @@ Validação nesta instância em 04/11/2026:
 Artefatos locais em `test-results/`: capturas desktop/mobile/assinatura e relatório PDF fictício. Os testes criam OS fictícias com prefixo E2E; a OS 41250 foi preservada. Não foram usados dados pessoais reais dos PDFs.
 
 Não executados: aparelhos Android/iOS físicos, Safari/WebKit, PostgreSQL externo, implantação HTTPS pública, testes de carga, restauração de backup em produção e auditoria independente de segurança/LGPD. As instruções de instalação e início foram salvas no rascunho do ambiente; publicação e restauração em uma nova tarefa ainda não foram verificadas.
+
+## Sincronização bidirecional dos dados
+
+- `npm test`: 17 testes de domínio, API e sincronização; todos passaram. Inclui autorização do SSE para gestor/técnicos, reatribuição de OS, erro isolado em uma OS, resposta perdida durante nova edição, conciliação de campos independentes, conflito verdadeiro no mesmo campo e fotografias adicionadas por dispositivos diferentes.
+- `python3 tests/realtime.py`: duas sessões de navegador conectadas ao mesmo backend. OS criada no computador apareceu no celular; check-in e diagnóstico do celular apareceram no computador; medição alterada no computador apareceu no celular, sem recarregar. Desconexão/reconexão com edições em campos diferentes conciliou os dois lados. Com SSE bloqueado, o fallback recuperou os dados sem duplicar a visita. Requisição HTTP presa foi abortada pelo prazo configurado.
+- `python3 tests/lan.py`: repetido incluindo explicitamente os dois sentidos de atualização de dados em origem HTTP insegura por IP (com relay de teste local devido à política da nuvem), além da atualização da versão do código.
+
+A rede particular e o computador Windows do usuário não são acessíveis a partir desta instância; a correção precisa ser instalada e o iniciador antigo reiniciado nesses aparelhos.

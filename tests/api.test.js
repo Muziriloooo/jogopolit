@@ -45,6 +45,16 @@ test('API: sessions, role isolation, no prices, idempotency, conflict and audit'
       baseRevision: record.revision,
       data: record.data,
     };
+    const originalQuery = db.query.bind(db);
+    db.query = async (...args) => {
+      if (args[0].includes('SELECT user_id,result FROM commands')) {
+        throw Object.assign(new Error('Simulated temporary database outage'), { code: '57P01' });
+      }
+      return originalQuery(...args);
+    };
+    const temporary = await request('/sync', 'POST', command, cookie);
+    assert.equal(temporary.status, 503);
+    db.query = originalQuery;
     const first = await request('/sync', 'POST', command, cookie);
     assert.equal(first.status, 200, JSON.stringify(first.data));
     const retry = await request('/sync', 'POST', command, cookie);

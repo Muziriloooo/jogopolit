@@ -3,11 +3,18 @@ import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
 import { randomBytes, createHash } from 'node:crypto';
+import { EventEmitter } from 'node:events';
 import { example } from './seed.js';
 import { orderSchema, sanitize, validateTransition } from './domain.js';
 const hash = (s) => createHash('sha256').update(s).digest('hex');
 export async function createApp(db) {
   const app = express();
+  const updates = new EventEmitter();
+  updates.setMaxListeners(0);
+  const liveClients = new Set();
+  app.locals.closeLiveConnections = () => {
+    for (const response of liveClients) response.end();
+  };
   app.disable('x-powered-by');
   app.use(
     helmet({
@@ -202,6 +209,35 @@ export async function createApp(db) {
         throw e;
       }
     });
+  app.get('/api/events', (req, res) => {
+    res.set({
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-store',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.flushHeaders();
+    liveClients.add(res);
+    const write = (data) => {
+      if (!res.writableEnded && !res.destroyed) res.write(data);
+    };
+    const send = () => write('data: {"type":"orders-changed"}\n\n');
+    const changed = (audience) => {
+      if (req.user.role !== 'tecnico' || audience.includes(req.user.id)) send();
+    };
+    updates.on('orders', changed);
+    write('data: {"type":"ready"}\n\n');
+    const heartbeat = setInterval(() => write(': heartbeat\n\n'), 20000);
+    const expires = setTimeout(() => res.end(), 5 * 60000);
+    heartbeat.unref();
+    expires.unref();
+    res.on('close', () => {
+      clearInterval(heartbeat);
+      clearTimeout(expires);
+      liveClients.delete(res);
+      updates.off('orders', changed);
+    });
+  });
   app.get('/api/orders', async (req, res) => {
     const r = await actorQuery(
       req.user,
@@ -236,6 +272,7 @@ export async function createApp(db) {
         return res.status(400).json({ error: 'Comando inválido.' });
       let next = orderSchema.parse(data);
       const user = req.user;
+      let audience;
       const result = await serial(async () => {
         await db.exec('BEGIN');
         try {
@@ -320,6 +357,7 @@ export async function createApp(db) {
             JSON.stringify(result),
           ]);
           await db.exec('COMMIT');
+          audience = [next.technicianId, prev?.technician_id].filter(Boolean);
           return result;
         } catch (e) {
           await db.exec('ROLLBACK');
@@ -332,11 +370,14 @@ export async function createApp(db) {
             'Esta OS mudou no servidor. Seu rascunho foi preservado. Exporte-o antes de carregar a versão atual.',
           ...result,
         });
+      if (audience) updates.emit('orders', audience);
       res.json(result);
     } catch (e) {
-      res.status(400).json({
-        error:
-          e.name === 'ZodError'
+      const databaseUnavailable = typeof e.code === 'string' && !e.code.startsWith('23');
+      res.status(databaseUnavailable ? 503 : 400).json({
+        error: databaseUnavailable
+          ? 'Banco temporariamente indisponível. Os registros continuam na fila para nova tentativa.'
+          : e.name === 'ZodError'
             ? 'Dados inválidos. Revise os campos e limites de imagens.'
             : e.message,
       });

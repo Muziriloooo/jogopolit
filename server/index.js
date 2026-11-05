@@ -33,6 +33,7 @@ let stopping = false;
 async function shutdown() {
   if (stopping) return;
   stopping = true;
+  app.locals.closeLiveConnections?.();
   server.closeIdleConnections();
   server.close(async () => {
     await db.close();

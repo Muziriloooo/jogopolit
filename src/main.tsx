@@ -39,6 +39,7 @@ import { report, money, date } from './pdf';
 import { watchUpdates } from './updates';
 import { watchLocalUpdates } from './local-updates';
 import { createId } from './ids';
+import { exchangeOrders } from './sync-engine';
 import './styles.css';
 const uid = createId;
 const day = () => new Date().toLocaleDateString('en-CA');
@@ -79,6 +80,8 @@ function App() {
   const ordersRef = useRef(orders);
   const [online, setOnline] = useState(navigator.onLine);
   const [busy, setBusy] = useState(false);
+  const [live, setLive] = useState(false);
+  const [lastSynced, setLastSynced] = useState<string>();
   const [notice, setNotice] = useState('');
   const [updateWaiting, setUpdateWaiting] = useState(false);
   const updateSafe = useRef<() => boolean>(() => false);
@@ -102,6 +105,8 @@ function App() {
     equipment: '',
   });
   const syncLock = useRef(false);
+  const syncAgain = useRef(false);
+  const syncNotice = useRef<string | undefined>(undefined);
   const localWrites = useRef(Promise.resolve());
   const replace = (rows: RecordOrder[]) => {
     ordersRef.current = rows;
@@ -139,65 +144,79 @@ function App() {
     syncLock.current = true;
     setBusy(true);
     try {
-      await localWrites.current;
-      for (const r of [...ordersRef.current].filter((r) => r.pending && !r.error)) {
-        try {
-          const result = await api('/sync', {
-            method: 'POST',
-            body: JSON.stringify({
-              commandId: r.commandId,
-              baseRevision: r.revision,
-              data: r.data,
-            }),
-          });
-          const latest = ordersRef.current.find((x) => x.data.id === r.data.id)!;
-          const next =
-            latest.commandId === r.commandId
-              ? { ...result, pending: false }
-              : { ...latest, revision: result.revision };
-          replace(ordersRef.current.map((x) => (x.data.id === r.data.id ? next : x)));
-          localWrites.current = localWrites.current.then(() => save(user, next));
+      const issues = await exchangeOrders({
+        records: () => ordersRef.current,
+        id: uid,
+        flush: () => localWrites.current,
+        put: async (record) => {
+          replace(ordersRef.current.map((r) => (r.data.id === record.data.id ? record : r)));
+          localWrites.current = localWrites.current.then(() => save(user, record));
           await localWrites.current;
-        } catch (e: any) {
-          if (e.status === 401) {
-            setLoginNeeded(true);
-            throw e;
-          }
-          if (e.status && e.status !== 503) {
-            const latest = ordersRef.current.find((x) => x.data.id === r.data.id)!;
-            const failed = { ...latest, error: e.message };
-            replace(ordersRef.current.map((x) => (x.data.id === r.data.id ? failed : x)));
-            localWrites.current = localWrites.current.then(() => save(user, failed));
-            await localWrites.current;
-          }
-          throw e;
-        }
+        },
+        send: (command) => api('/sync', { method: 'POST', body: JSON.stringify(command) }),
+        pull: () => api('/orders'),
+        commit: async (merged) => {
+          replace(merged);
+          for (const r of merged)
+            localWrites.current = localWrites.current.then(() => save(user, r));
+          await localWrites.current;
+        },
+      });
+      setLastSynced(new Date().toLocaleTimeString('pt-BR'));
+      const unresolved = ordersRef.current
+        .filter((r) => r.pending && r.error)
+        .map((r) => `OS ${r.data.id}: ${r.error}`);
+      const warning = [...new Set([...issues, ...unresolved])].join(' · ');
+      if (warning) {
+        syncNotice.current = warning;
+        setNotice(warning);
+      } else if (syncNotice.current) {
+        const previous = syncNotice.current;
+        syncNotice.current = undefined;
+        setNotice((current) => (current === previous ? '' : current));
       }
-      const remote: RecordOrder[] = await api('/orders');
-      await localWrites.current;
-      const merged = remote.map(
-        (r) => ordersRef.current.find((x) => x.data.id === r.data.id && x.pending) || r,
-      );
-      for (const r of ordersRef.current)
-        if (r.pending && !merged.some((x) => x.data.id === r.data.id)) merged.push(r);
-      replace(merged);
-      for (const r of merged) localWrites.current = localWrites.current.then(() => save(user, r));
-      await localWrites.current;
       setUsers(await api('/users'));
     } catch (e: any) {
-      setNotice(e.message || 'Sem conexão. Dados mantidos no dispositivo.');
+      if (e.status === 401) setLoginNeeded(true);
+      const message = e.message || 'Sem conexão. Dados mantidos no dispositivo.';
+      syncNotice.current = message;
+      setNotice(message);
     } finally {
       setBusy(false);
       syncLock.current = false;
+      if (syncAgain.current) {
+        syncAgain.current = false;
+        setTimeout(() => void sync(), 0);
+      }
     }
   }
   useEffect(() => {
     if (user && online) {
       sync();
-      const timer = setInterval(sync, 15000);
+      const timer = setInterval(sync, live ? 30000 : 3000);
       return () => clearInterval(timer);
     }
-  }, [user?.id, online]);
+  }, [user?.id, online, live]);
+  useEffect(() => {
+    if (!user || !online || loginNeeded) {
+      setLive(false);
+      return;
+    }
+    const stream = new EventSource('/api/events');
+    stream.onopen = () => {
+      setLive(true);
+      void sync();
+    };
+    stream.onmessage = () => {
+      if (syncLock.current) syncAgain.current = true;
+      else void sync();
+    };
+    stream.onerror = () => setLive(false);
+    return () => {
+      stream.close();
+      setLive(false);
+    };
+  }, [user?.id, online, loginNeeded]);
   // Resume promptly when a phone returns from the lock screen or another app.
   useEffect(() => {
     const refresh = () => {
@@ -213,7 +232,7 @@ function App() {
   // Send completed local edits promptly; the regular poll still fetches remote edits.
   useEffect(() => {
     if (!user || !online || !orders.some((r) => r.pending && !r.error)) return;
-    const timer = setTimeout(() => void sync(), 2000);
+    const timer = setTimeout(() => void sync(), 600);
     return () => clearTimeout(timer);
   }, [orders, user?.id, online]);
   useEffect(() => {
@@ -231,6 +250,8 @@ function App() {
     const next: RecordOrder = {
       data,
       revision: old?.revision || 0,
+      inFlight: old?.inFlight,
+      baseData: old?.pending ? old.baseData : old?.data,
       pending: true,
       commandId: uid(),
     };
@@ -431,7 +452,7 @@ function App() {
               onClick={sync}
               disabled={busy || !online}
               aria-label="Sincronizar"
-              title="Sincronizar"
+              title={lastSynced ? `Última sincronização: ${lastSynced}` : 'Sincronizar'}
             >
               <RefreshCw size={15} className={busy ? 'spin' : ''} />
               <span>
@@ -455,6 +476,22 @@ function App() {
               </span>
             </div>
           )}
+          <div className="sync-status" role="status">
+            <span className={live ? 'live-dot connected' : 'live-dot'} />
+            <span>
+              {!online
+                ? 'Offline · registros salvos neste aparelho'
+                : live
+                  ? 'Atualizações em tempo real'
+                  : 'Consultando alterações automaticamente'}
+              {lastSynced ? ` · ${lastSynced}` : ''}
+            </span>
+            {pending > 0 && (
+              <strong>
+                {pending} OS pendente{pending > 1 ? 's' : ''} de envio
+              </strong>
+            )}
+          </div>
           {notice && (
             <div className="notice" role="status">
               <AlertCircle size={18} />

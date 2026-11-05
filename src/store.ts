@@ -24,17 +24,43 @@ export async function clearDevice() {
   await d.clear('orders');
   await d.clear('meta');
 }
-export async function api(url: string, options?: RequestInit) {
-  const response = await fetch('/api' + url, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-  });
-  const data = await response.json();
-  if (!response.ok)
-    throw Object.assign(new Error(data.error || 'Erro de comunicação.'), {
-      status: response.status,
+export async function api(url: string, options: RequestInit & { timeoutMs?: number } = {}) {
+  const { timeoutMs = url === '/sync' ? 60000 : 12000, signal, ...request } = options;
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  signal?.addEventListener('abort', abort, { once: true });
+  if (signal?.aborted) controller.abort();
+  const timer = setTimeout(abort, timeoutMs);
+  try {
+    const response = await fetch('/api' + url, {
+      ...request,
+      cache: 'no-store',
+      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json', ...options.headers },
     });
-  return data;
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error(
+        'O servidor não respondeu como API. Confira o endereço e tente sincronizar novamente.',
+      );
+    }
+    if (!response.ok)
+      throw Object.assign(new Error(data.error || 'Erro de comunicação.'), {
+        status: response.status,
+      });
+    return data;
+  } catch (error: any) {
+    if (error.name === 'AbortError')
+      throw new Error(
+        'O servidor demorou a responder. Os dados foram mantidos para uma nova tentativa automática.',
+      );
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', abort);
+  }
 }
 export async function compress(file: File): Promise<string> {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type))

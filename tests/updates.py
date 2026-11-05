@@ -8,12 +8,16 @@ ROOT=Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory() as tmp:
  folder=Path(tmp);shutil.copytree(ROOT/'dist',folder,dirs_exist_ok=True)
  original=(folder/'sw.js').read_text()
+ authenticated={'enabled':False}
  class Handler(SimpleHTTPRequestHandler):
   def __init__(self,*args,**kwargs):super().__init__(*args,directory=tmp,**kwargs)
   def log_message(self,*args):pass
   def end_headers(self):self.send_header('Cache-Control','no-store');super().end_headers()
   def do_GET(self):
    if self.path.startswith('/api/'):
+    if authenticated['enabled'] and self.path in ['/api/me','/api/orders','/api/users']:
+     payload={'user':{'id':'update-test','name':'Teste','email':'test@local.test','role':'tecnico'},'demo':True} if self.path=='/api/me' else []
+     self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers();self.wfile.write(json.dumps(payload).encode());return
     self.send_response(401);self.send_header('Content-Type','application/json');self.end_headers();self.wfile.write(b'{"error":"Entre novamente"}');return
    super().do_GET()
  server=ThreadingHTTPServer(('127.0.0.1',0),Handler);threading.Thread(target=server.serve_forever,daemon=True).start()
@@ -37,6 +41,7 @@ with tempfile.TemporaryDirectory() as tmp:
   expect(page.get_by_role('heading',name='Vamos ao trabalho?')).to_be_visible()
   # Cache switching never clears IndexedDB, even with an unsent order.
   page.evaluate('''async()=>{const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('sl-campo',1);r.onsuccess=()=>resolve(r.result);r.onerror=reject});const tx=db.transaction(['meta','orders'],'readwrite');tx.objectStore('meta').put({id:'update-test',name:'Teste',email:'test@local.test',role:'tecnico'},'user');tx.objectStore('orders').put({key:'update-test:draft',owner:'update-test',record:{revision:0,pending:true,error:'Pendente para teste',commandId:'draft',data:{id:'draft',client:'Teste',unit:'Unidade',equipment:'Máquina',asset:'SL',hours:0,type:'Preventiva',priority:'Média',status:'Pendente',technicianId:'update-test',scheduled:'2026-11-04',parts:[],visits:[]}}});await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=reject});db.close();}''')
+  authenticated['enabled']=True
   page.reload();expect(page.get_by_role('heading',name='Olá, Teste.')).to_be_visible()
   page.evaluate('window.releaseMarker="pending"')
   publish('c');page.evaluate('navigator.serviceWorker.getRegistration().then(r=>r.update())')

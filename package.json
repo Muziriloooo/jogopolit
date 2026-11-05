@@ -15,7 +15,8 @@
     "format": "prettier --write src server tooling tests/*.js public/*.js public/*.webmanifest *.json *.ts *.html README.md docs/*.md",
     "format:check": "prettier --check src server tooling tests/*.js public/*.js public/*.webmanifest *.json *.ts *.html README.md docs/*.md",
     "test:updates": "python3 tests/updates.py",
-    "test:lan": "python3 tests/lan.py"
+    "test:lan": "python3 tests/lan.py",
+    "test:realtime": "python3 tests/realtime.py"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.14",

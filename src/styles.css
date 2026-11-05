@@ -3222,3 +3222,29 @@ label {
     display: none;
   }
 }
+
+.sync-status {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: #617497;
+  margin: 0 0 16px;
+  line-height: 1.7;
+}
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #c99c44;
+  flex-shrink: 0;
+}
+.live-dot.connected {
+  background: #2c925c;
+  box-shadow: 0 0 0 3px #e5f5eb;
+}
+.sync-status strong {
+  color: #966b00;
+  font-weight: 500;
+}

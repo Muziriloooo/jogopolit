@@ -95,7 +95,7 @@ O iniciador mostra os IPs da máquina. A porta 5173 agora é fixa: se já estive
 
 **Para receber esta correção pela primeira vez:** feche a janela anterior do sistema com `Ctrl+C`, atualize os arquivos (ou execute `atualizar.bat` se a pasta foi clonada com Git), execute `iniciar.bat` e recarregue a página uma vez em cada aparelho. Não apague `.env`, `.data` ou os dados do navegador. O atualizador preserva a configuração/banco e interrompe se houver alterações locais; exige Git e conexão com o GitHub. Cópias obtidas por ZIP precisam receber os novos arquivos manualmente, preservando os dados locais.
 
-Depois disso, alterações nos arquivos do projeto são detectadas no computador e no celular por consulta HTTP a cada **3 segundos**, sem depender do WebSocket do Vite ou de service worker. Isso também funciona no endereço HTTP por IP. O recarregamento espera o fim do preenchimento e a sincronização dos dados; um atendimento aberto na tela não é interrompido. Para aplicar a nova versão após preencher, sincronize e volte para a lista/início. Alterações de dados (OS, atribuições e laudos) continuam usando a sincronização da API: envio após aproximadamente 2 segundos e consulta de outros dispositivos a cada 15 segundos.
+Depois disso, alterações nos arquivos do projeto são detectadas no computador e no celular por consulta HTTP a cada **3 segundos**, sem depender do WebSocket do Vite ou de service worker. Isso também funciona no endereço HTTP por IP. O recarregamento espera o fim do preenchimento e a sincronização dos dados; um atendimento aberto na tela não é interrompido. Para aplicar a nova versão após preencher, sincronize e volte para a lista/início. Alterações de dados (OS, atribuições e laudos) são enviadas após aproximadamente 600 ms sem nova edição. O servidor avisa os outros aparelhos em tempo real; quando o canal ao vivo não está disponível, a consulta automática ocorre a cada 3 segundos.
 
 A API agora reinicia automaticamente quando seus módulos são alterados, fechando o banco antes de reiniciar. Alterações de dependências e configuração ainda podem exigir parar e iniciar novamente. Enviar código para o GitHub não baixa arquivos automaticamente no seu computador: use `atualizar.bat` para isso.
 
@@ -109,7 +109,13 @@ Ambos precisam acessar **o mesmo endereço HTTPS da mesma instalação**, com a 
 
 ### Dados da operação
 
-Registros são salvos primeiro no dispositivo. Alterações são enviadas após aproximadamente 2 segundos sem novas edições, quando há conexão. Ordens alteradas em outro dispositivo são consultadas a cada 15 segundos e ao voltar para a janela/aplicativo. Rascunhos locais têm prioridade até sincronizar; conflitos entre dispositivos continuam exigindo revisão, sem sobrescrita silenciosa. Sem conexão, tudo permanece na fila.
+Registros são salvos primeiro no dispositivo e enviados após aproximadamente **600 ms** sem novas edições, quando há conexão. Depois do commit no banco, o servidor avisa imediatamente os gestores e os técnicos autorizados por um canal autenticado de eventos (SSE). O outro aparelho busca os dados atualizados sem recarregar a página, inclusive se o formulário estiver aberto.
+
+Se o canal ao vivo estiver bloqueado ou desconectar, o sistema continua consultando a API a cada **3 segundos**. Com o canal ativo, uma consulta periódica a cada 30 segundos também reconcilia o estado. Ao voltar para o aplicativo ou reconectar, há uma verificação imediata. O indicador mostra “Atualizações em tempo real”, o horário da última sincronização e a quantidade de OS pendentes. Isso se refere aos dados, independentemente da atualização da versão do código.
+
+Requisições comuns possuem limite de 12 segundos e uploads de sincronização, de 60 segundos; depois há nova tentativa. Um erro em uma OS não interrompe o recebimento das outras. O comando original é preservado em IndexedDB até ser reconhecido pelo servidor, mesmo se houver uma nova edição ou a resposta da rede for perdida.
+
+Na reconexão, alterações em campos diferentes da mesma OS são conciliadas automaticamente a partir da versão original. Se os dois aparelhos alterarem a mesma informação de formas diferentes, o rascunho é preservado e a OS pede revisão; os demais registros continuam sincronizando. Sem conexão, tudo permanece na fila.
 
 ### Novas versões do aplicativo
 
@@ -122,3 +128,9 @@ A nova versão é baixada em segundo plano. O recarregamento automático só aco
 Alterar arquivos no computador ou enviar ao GitHub não altera, por si só, o site publicado. A hospedagem precisa executar `npm ci`, `npm run build`, publicar o diretório `dist` e reiniciar a API quando necessário, preservando o banco e as variáveis de ambiente. É possível automatizar isso com o deploy da hospedagem ligado à branch `main`; a configuração exata depende do provedor. Não publique `.env`, `.data` ou cópias do banco no repositório. O servidor Node já envia políticas de cache adequadas para HTML/service worker e assets versionados; mantenha essas políticas em qualquer CDN/proxy.
 
 Para verificar releases de PWA sem depender de hospedagem externa, execute `npm run build` e `python3 tests/updates.py`. O teste usa service workers reais no Chromium e verifica instalação inicial, atualização em repouso, proteção de campos em edição, rascunhos no IndexedDB e ativação por outra aba.
+
+### Hospedagem e teste do canal ao vivo
+
+A rota `/api/events` precisa manter a conexão aberta, com cookies e sem buffering de proxy/CDN. O backend envia `X-Accel-Buffering: no` e heartbeat a cada 20 segundos; configure timeout de leitura maior que 5 minutos. O Vite encaminha essa rota pelo mesmo proxy de `/api`. Cada conexão é autenticada, não envia conteúdo de laudos/fotos e apenas avisa os usuários autorizados; as consultas continuam sujeitas às permissões. O reinício da API encerra os canais antes de fechar o banco, e os navegadores reconectam automaticamente.
+
+Com `npm run dev` e o banco demonstrativo ativo, `npm run test:realtime` abre duas sessões independentes (gestor no computador e técnico no layout móvel). O teste cria uma OS no computador, recebe no celular, envia diagnóstico do celular para o computador e envia uma medição no sentido inverso, sem recarregar. Também desconecta o celular, altera campos diferentes nos dois lados, reconecta com o canal SSE bloqueado e verifica a conciliação pelo fallback, sem duplicar a visita. O teste não equivale à verificação do roteador ou da instalação Windows do usuário.
