@@ -46,7 +46,11 @@ const visit = z.object({
     .optional(),
 });
 export const orderSchema = z.object({
-  id: z.string().regex(/^[a-zA-Z0-9-]{1,50}$/),
+  id: z
+    .string()
+    .min(1)
+    .max(512)
+    .refine((value) => value.trim().length > 0 && !/[\u0000-\u001f\u007f]/.test(value)),
   supplierOrder: z.string().max(50).default(''),
   client: z.string().min(1).max(150),
   unit: z.string().min(1).max(150),

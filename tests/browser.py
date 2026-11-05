@@ -3,7 +3,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright,expect
 BASE=os.environ.get('SL_URL','http://127.0.0.1:5173')
 ART=Path('test-results');ART.mkdir(exist_ok=True)
-ORDER='E2E-'+uuid.uuid4().hex[:8]
+ORDER='E2E '+uuid.uuid4().hex[:8]+'/2026_A'
 with sync_playwright() as p:
  browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox','--disable-dev-shm-usage'])
  context=browser.new_context(viewport={'width':1440,'height':1000},accept_downloads=True,has_touch=True)

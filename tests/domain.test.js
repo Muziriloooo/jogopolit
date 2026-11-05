@@ -81,6 +81,11 @@ test('nome do técnico pode ficar vazio enquanto a contratação está pendente'
   const parsed = orderSchema.parse(data);
   assert.equal(parsed.technicianName, '');
 });
+test('número da OS aceita o formato usado pelo cliente', () => {
+  const data = example();
+  data.id = 'OS 44.918/2026_A';
+  assert.equal(orderSchema.parse(data).id, data.id);
+});
 test('instalação e saída enviadas juntas preservam a instalação feita durante visita aberta', () => {
   const before = example();
   before.parts[0].status = 'Entregue';

@@ -2654,7 +2654,7 @@ function NewOrder({
               technicianName.toLocaleLowerCase('pt-BR'),
           );
           create({
-            id: get('id'),
+            id: get('id').trim(),
             client: get('client'),
             unit: get('unit'),
             address: get('address'),
@@ -2695,12 +2695,7 @@ function NewOrder({
           ].map(([k, l], i) => (
             <label key={k}>
               {l}
-              <input
-                name={k}
-                required={i < 4}
-                maxLength={k === 'id' ? 50 : 150}
-                pattern={k === 'id' ? '[A-Za-z0-9-]+' : undefined}
-              />
+              <input name={k} required={i < 4} maxLength={k === 'id' ? 512 : 150} />
             </label>
           ))}
           <label>

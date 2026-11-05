@@ -162,3 +162,27 @@ test('rascunho com erro antigo de primeira sincronização é recuperado automat
   assert.equal(f.local()[0].data.visits.length, data.visits.length);
   assert.equal(f.local()[0].data.visits[0].diagnosis, data.visits[0].diagnosis);
 });
+test('rascunho com formato antigo de número da OS tenta sincronizar novamente', async () => {
+  const data = example();
+  data.id = 'OS 44.918/2026_A';
+  const f = fixture(
+    [
+      {
+        data,
+        revision: 0,
+        commandId: 'recover-id',
+        pending: true,
+        recoveryVersion: 2,
+        error:
+          'Número da OS: valor inválido ou não preenchido. Corrija esse campo e tente novamente.',
+      },
+    ],
+    [],
+  );
+  let stored;
+  f.io.send = async (command) => (stored = { data: command.data, revision: 1 });
+  f.io.pull = async () => (stored ? [stored] : []);
+  await exchangeOrders(f.io);
+  assert.ok(!f.local()[0].pending);
+  assert.equal(f.local()[0].data.id, data.id);
+});

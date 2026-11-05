@@ -16,17 +16,17 @@ export type Exchange = {
 export async function exchangeOrders(io: Exchange): Promise<string[]> {
   const issues: string[] = [];
   await io.flush();
-  // Retry the old generic validation failures once after this compatibility fix.
+  // Retry validation failures once after compatibility fixes are installed.
   for (const record of io.records()) {
     if (
       record.pending &&
       record.error &&
-      record.recoveryVersion !== 2 &&
-      /Nova OS deve começar pendente|Dados inválidos\. Revise os campos e limites de imagens/.test(
+      record.recoveryVersion !== 3 &&
+      /Nova OS deve começar pendente|Dados inválidos\. Revise os campos e limites de imagens|Número da OS: valor inválido ou não preenchido/.test(
         record.error,
       )
     ) {
-      await io.put({ ...record, error: undefined, recoveryVersion: 2 });
+      await io.put({ ...record, error: undefined, recoveryVersion: 3 });
     }
   }
   if (io.deleted && io.remove) {
