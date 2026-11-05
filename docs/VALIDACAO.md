@@ -33,3 +33,11 @@ Exclusão executada pela interface autenticada de administrador: havia 10 chamad
 Os testes de exclusão verificam inicialização vazia, bloqueio de exclusão por técnico/gestor, transação de limpeza, remoção dos snapshots, HTTP 410 para reenvio de chamado excluído, remoção das sessões dos técnicos, preservação de gestor/administrador e ausência de recriação dos exemplos no reinício.
 
 Essa limpeza foi feita na instância acessível desta tarefa. Um banco que esteja no computador do usuário precisa receber a mesma ação administrativa pela interface local.
+
+## Correções dos avisos de sincronização e perfis
+
+- `npm test`: 25 testes, incluindo OS preenchida antes do primeiro envio, campos legados opcionais, mensagens por campo, migração de gestor mantendo senha/referências, revogação do login antigo e exclusão individual restrita a administrador.
+- `tests/requests.py` com banco temporário: rascunho da conta antiga foi recuperado, o aviso “Nova OS deve começar pendente...” foi resolvido sem apagar o laudo, uma OS criada/iniciada offline foi enviada após reconectar, os dois campos removidos não apareceram, uma foto acima de 1,6 milhão de caracteres foi reduzida automaticamente e a exclusão de uma OS não afetou outra. Técnico não viu o botão e recebeu HTTP 403 ao tentar excluir pela API.
+- Os testes completos de formulário/fotos/assinatura/PDF, sincronização bidirecional e origem HTTP local foram repetidos com o login único do administrador e banco temporário.
+
+A conta antiga de gestor fica arquivada e sem acesso, preservando suas referências históricas. A senha do administrador principal não é alterada.

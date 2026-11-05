@@ -73,19 +73,77 @@ export async function compress(file: File): Promise<string> {
   if (file.size > 25 * 1024 * 1024) throw Error('Imagem maior que 25 MB.');
   const url = URL.createObjectURL(file);
   try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const i = new Image();
-      i.onload = () => resolve(i);
-      i.onerror = () => reject(Error('Não foi possível abrir a imagem.'));
-      i.src = url;
-    });
-    const scale = Math.min(1, 1400 / Math.max(img.width, img.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width * scale;
-    canvas.height = img.height * scale;
-    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/jpeg', 0.78);
+    return await fitImage(url);
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+/** Migrate only aliases explicitly authorized by the server after administrator login. */
+export async function migrateAccounts(user: User) {
+  if (user.role !== 'admin' || !user.mergedUserIds?.length) return;
+  const d = await db;
+  const tx = d.transaction(['orders', 'meta'], 'readwrite');
+  const archive = (await tx.objectStore('meta').get('recovered:' + user.id)) || [];
+  const aliases = new Set(user.mergedUserIds);
+  for (const entry of await tx.objectStore('orders').getAll()) {
+    if (!aliases.has(entry.owner)) continue;
+    const key = user.id + ':' + entry.record.data.id;
+    const existing = await tx.objectStore('orders').get(key);
+    if (!existing || (!existing.record.pending && entry.record.pending)) {
+      await tx.objectStore('orders').put({ key, owner: user.id, record: entry.record });
+    } else if (
+      entry.record.pending &&
+      JSON.stringify(existing.record) !== JSON.stringify(entry.record)
+    ) {
+      archive.push(entry.record);
+    }
+    await tx.objectStore('orders').delete(entry.key);
+  }
+  await tx.objectStore('meta').put(archive, 'recovered:' + user.id);
+  await tx.done;
+}
+export async function recoveredDrafts(user: User): Promise<RecordOrder[]> {
+  return (await (await db).get('meta', 'recovered:' + user.id)) || [];
+}
+async function fitImage(src: string, format: 'jpeg' | 'png' = 'jpeg'): Promise<string> {
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () =>
+      reject(Error('Não foi possível ler uma imagem. Substitua a foto e tente novamente.'));
+    image.src = src;
+  });
+  let edge = 1400,
+    quality = 0.78;
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const scale = Math.min(1, edge / Math.max(img.width, img.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(img.width * scale));
+    canvas.height = Math.max(1, Math.round(img.height * scale));
+    const context = canvas.getContext('2d')!;
+    if (format === 'jpeg') {
+      context.fillStyle = '#fff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    context.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const data = canvas.toDataURL('image/' + format, quality);
+    if (data.length <= 1400000) return data;
+    if (format === 'jpeg' && quality > 0.5) quality -= 0.12;
+    else edge = Math.max(200, Math.floor(edge * 0.8));
+  }
+  throw Error('A imagem continua muito grande. Selecione outra foto. Seu laudo foi preservado.');
+}
+export async function prepareOrderForSync(order: import('./types').Order) {
+  const next = structuredClone(order);
+  if (!Array.isArray(next.visits)) return next;
+  for (const visit of next.visits) {
+    if (!visit || typeof visit !== 'object') continue;
+    for (const photo of Array.isArray(visit.photos) ? visit.photos : [])
+      if (typeof photo?.data === 'string' && photo.data.length > 1400000)
+        photo.data = await fitImage(photo.data);
+    if (typeof visit.signature === 'string' && visit.signature.length > 1400000)
+      visit.signature = await fitImage(visit.signature, 'png');
+  }
+  return next;
 }

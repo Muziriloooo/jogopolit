@@ -15,12 +15,11 @@ npm run dev
 
 Vite: porta 5173, API: porta 3001. O motor PostgreSQL embarcado inicializa em `.data/postgres`. Não apague `.data` para atualizar dependências. As tabelas são criadas automaticamente de modo idempotente.
 
-Na primeira inicialização demonstrativa são criadas somente duas contas administrativas com a senha configurada em `DEMO_PASSWORD`:
+Na primeira inicialização demonstrativa é criado somente um login administrativo com a senha configurada em `DEMO_PASSWORD`:
 
-- `gestor@slcampo.local`: Marina Costa, gestor.
 - `admin@slcampo.local`: administrador.
 
-O sistema inicia **sem chamados e sem técnicos**. Entre como administrador e cadastre os técnicos em Equipe técnica → Adicionar usuário. Os usuários administrativos demonstrativos são fictícios. Contas não são recriadas se o banco já tiver usuários. Mudar `DEMO_PASSWORD` após o primeiro boot não altera senhas existentes.
+O sistema inicia **sem chamados e sem técnicos**. Entre como administrador e cadastre os técnicos em Equipe técnica → Adicionar usuário. O login administrativo demonstrativo é fictício. Contas não são recriadas se o banco já tiver usuários. Mudar `DEMO_PASSWORD` após o primeiro boot não altera senhas existentes.
 
 ## Iniciar no Windows
 
@@ -28,7 +27,7 @@ Instale o **Node.js 24 ou superior**, com npm, e dê dois cliques em `iniciar.ba
 
 O arquivo verifica o Node, instala dependências com `npm ci` na primeira execução e quando o lockfile mudar, e inicia a API e a interface. Aguarde o Vite informar o endereço no terminal e abra-o no navegador (porta padrão 5173). A primeira instalação exige internet. Não é necessário instalar PostgreSQL para a demonstração local.
 
-Se `.env` não existir, o iniciador cria uma configuração **somente para demonstração local**, usando as duas contas administrativas listadas acima e a senha pública `Campo-demo-2026!`. Se `.env` já existir, ele é preservado. O banco `.data` também é preservado; senhas de usuários já cadastrados não são alteradas pelo iniciador. Para reinstalar as dependências manualmente, remova somente `node_modules/.sl-campo-lock` e execute novamente.
+Se `.env` não existir, o iniciador cria uma configuração **somente para demonstração local**, usando o único login administrativo listado acima e a senha pública `Campo-demo-2026!`. Se `.env` já existir, ele é preservado. O banco `.data` também é preservado; senhas de usuários já cadastrados não são alteradas pelo iniciador. Para reinstalar as dependências manualmente, remova somente `node_modules/.sl-campo-lock` e execute novamente.
 
 O iniciador executa o modo de desenvolvimento. Para instalar e testar o PWA ou publicar em HTTPS, siga as seções abaixo. O arquivo foi revisado neste ambiente Linux; a execução no Windows ainda precisa ser validada.
 
@@ -41,23 +40,27 @@ npm run preview
 # Com a API ainda em execução, testa build com service worker na porta 4173.
 ```
 
-`npm test` executa domínio e API em banco isolado. Para os testes do navegador, use um banco demonstrativo **isolado**, `DEMO_PASSWORD=Campo-demo-2026!`, `DEMO_SEED_EXAMPLES=true`, Chromium em `/usr/bin/chromium`, Python e Playwright (`python3 -m pip install playwright`). Os testes criam OS fictícias adicionais. Pare a execução normal antes de iniciar o ambiente de testes na mesma porta. Por exemplo: `DATA_DIR=.data/test-fixtures DEMO_MODE=true DEMO_SEED_EXAMPLES=true DEMO_PASSWORD=Campo-demo-2026! npm run dev`. Esse opt-in cria o técnico fictício e a OS 41250 somente nesse banco separado. Não use a flag no banco da operação.
+`npm test` executa domínio, API, migração e sincronização em banco isolado. Os testes de navegador requerem Chromium em `/usr/bin/chromium`, Python e Playwright (`python3 -m pip install playwright`). Os comandos abaixo preparam automaticamente um banco temporário com dados fictícios e servidores nas portas 5191/5192. Não é necessário alterar `.env` nem preencher o banco da operação.
 
 ```sh
 npm run test:browser
-SL_URL=http://127.0.0.1:4173 SL_OFFLINE=1 python3 tests/browser.py
+npm run test:realtime
+npm run test:requests
+npm run test:lan
 ```
+
+A fixture 41250 e o técnico de teste só são criados no banco temporário por opt-in de `DEMO_SEED_EXAMPLES=true`; mantenha essa flag desativada na operação. Para testar a atualização do PWA, gere o build e execute `npm run test:updates`.
 
 Capturas e PDF ficam em `test-results/` (ignorado). Os testes não alteram a OS de referência. Para homologar em aparelhos reais, publique sob HTTPS e valide Chrome Android e Safari iOS. Instale pelo menu do navegador (Android) ou Compartilhar → Adicionar à Tela de Início (iOS). Primeira abertura e sincronização exigem conexão.
 
 ## Fluxo de uso
 
-1. Gestor cria OS e atribui técnico; sincroniza.
+1. Administrador cria a OS e define o responsável; sincroniza.
 2. Técnico entra e sincroniza ordens; abre OS e inicia atendimento.
 3. Confere equipamento, registra laudo, fotos, solicitações na aba Peças e assinatura ou justificativa.
 4. Finaliza a visita e baixa os documentos. A OS permanece aberta.
-5. Gestor aprova e registra entrega. Em nova visita, técnico instala peças entregues e registra resultados.
-6. Gestor encerra a OS sem pendências. Para conflito de edição, exporte o rascunho antes de carregar a versão do servidor.
+5. Administrador aprova e registra entrega. Em nova visita, técnico instala peças entregues e registra resultados.
+6. Administrador encerra a OS sem pendências. Para conflito de edição, exporte o rascunho antes de carregar a versão do servidor.
 
 ## Publicação
 
@@ -100,7 +103,7 @@ A API agora reinicia automaticamente quando seus módulos são alterados, fechan
 
 **Limite do HTTP no celular:** a atualização e o atendimento online funcionam na rede local, incluindo IDs compatíveis quando `crypto.randomUUID` não está disponível. Instalação PWA, service worker/offline, geolocalização e recursos de câmera que exigem contexto seguro precisam de HTTPS. Seleção de imagens pela galeria e assinatura por toque continuam disponíveis conforme o navegador. Essa limitação é do navegador, não deve ser contornada desativando proteções.
 
-Teste automatizado: com a API demonstrativa ativa, execute `npm run test:lan`. O teste usa duas origens de navegador e uma cópia isolada do código, confirma criação de OS no computador, recebimento no celular, check-in em HTTP inseguro, atualização de código e preservação do laudo. Neste ambiente de nuvem, um relay local simula a origem IP porque o proxy bloqueia tráfego LAN direto. Para testar uma rede real, use `SL_LAN_DIRECT=1 SL_LAN_HOST=IP-DA-MAQUINA python3 tests/lan.py` em ambiente autorizado; o servidor de teste usa a porta 5188.
+Teste automatizado: execute `npm run test:lan`; um banco temporário isolado é preparado automaticamente. O teste usa duas origens de navegador e uma cópia isolada do código, confirma criação de OS no computador, recebimento no celular, check-in em HTTP inseguro, atualização de código e preservação do laudo. Neste ambiente de nuvem, um relay local simula a origem IP porque o proxy bloqueia tráfego LAN direto. Para testar uma rede real, use `SL_LAN_DIRECT=1 SL_LAN_HOST=IP-DA-MAQUINA python3 tests/lan.py` em ambiente autorizado; o servidor de teste usa a porta 5188.
 
 ## Atualização automática do PWA publicado em HTTPS
 
@@ -108,7 +111,7 @@ Ambos precisam acessar **o mesmo endereço HTTPS da mesma instalação**, com a 
 
 ### Dados da operação
 
-Registros são salvos primeiro no dispositivo e enviados após aproximadamente **600 ms** sem novas edições, quando há conexão. Depois do commit no banco, o servidor avisa imediatamente os gestores e os técnicos autorizados por um canal autenticado de eventos (SSE). O outro aparelho busca os dados atualizados sem recarregar a página, inclusive se o formulário estiver aberto.
+Registros são salvos primeiro no dispositivo e enviados após aproximadamente **600 ms** sem novas edições, quando há conexão. Depois do commit no banco, o servidor avisa imediatamente o administrador e os técnicos autorizados por um canal autenticado de eventos (SSE). O outro aparelho busca os dados atualizados sem recarregar a página, inclusive se o formulário estiver aberto.
 
 Se o canal ao vivo estiver bloqueado ou desconectar, o sistema continua consultando a API a cada **3 segundos**. Com o canal ativo, uma consulta periódica a cada 30 segundos também reconcilia o estado. Ao voltar para o aplicativo ou reconectar, há uma verificação imediata. O indicador mostra “Atualizações em tempo real”, o horário da última sincronização e a quantidade de OS pendentes. Isso se refere aos dados, independentemente da atualização da versão do código.
 
@@ -132,10 +135,22 @@ Para verificar releases de PWA sem depender de hospedagem externa, execute `npm 
 
 A rota `/api/events` precisa manter a conexão aberta, com cookies e sem buffering de proxy/CDN. O backend envia `X-Accel-Buffering: no` e heartbeat a cada 20 segundos; configure timeout de leitura maior que 5 minutos. O Vite encaminha essa rota pelo mesmo proxy de `/api`. Cada conexão é autenticada, não envia conteúdo de laudos/fotos e apenas avisa os usuários autorizados; as consultas continuam sujeitas às permissões. O reinício da API encerra os canais antes de fechar o banco, e os navegadores reconectam automaticamente.
 
-Com `npm run dev` e o banco demonstrativo ativo, `npm run test:realtime` abre duas sessões independentes (gestor no computador e técnico no layout móvel). O teste cria uma OS no computador, recebe no celular, envia diagnóstico do celular para o computador e envia uma medição no sentido inverso, sem recarregar. Também desconecta o celular, altera campos diferentes nos dois lados, reconecta com o canal SSE bloqueado e verifica a conciliação pelo fallback, sem duplicar a visita. O teste não equivale à verificação do roteador ou da instalação Windows do usuário.
+`npm run test:realtime` prepara um banco temporário isolado e abre duas sessões independentes (administrador no computador e técnico no layout móvel). O teste cria uma OS no computador, recebe no celular, envia diagnóstico do celular para o computador e envia uma medição no sentido inverso, sem recarregar. Também desconecta o celular, altera campos diferentes nos dois lados, reconecta com o canal SSE bloqueado e verifica a conciliação pelo fallback, sem duplicar a visita. O teste não equivale à verificação do roteador ou da instalação Windows do usuário.
 
 ## Excluir chamados e técnicos
 
 Entre como **administrador** e abra **Configurações**. “Excluir todos os chamados” remove ordens, visitas, fotos, assinaturas, peças e cópias dos relatórios na fila de comandos do servidor. Usuários e configuração são preservados. A exclusão é propagada aos outros aparelhos; os IDs excluídos ficam registrados como tombstones mínimos para impedir que um aparelho offline restaure os chamados posteriormente. Esses números não podem ser reutilizados.
 
-Em seguida, “Excluir todos os técnicos” remove os técnicos e suas sessões, preservando administradores e gestores. O servidor bloqueia a exclusão enquanto houver chamados atribuídos. Ações estão restritas ao perfil administrador e pedem confirmação na interface. Os exemplos não são recriados ao reiniciar. A atualização do código sozinha não apaga bancos que estejam em outro computador: use essas ações na instalação correspondente.
+Em seguida, “Excluir todos os técnicos” remove os técnicos e suas sessões, preservando o administrador. O servidor bloqueia a exclusão enquanto houver chamados atribuídos. Ações estão restritas ao perfil administrador e pedem confirmação na interface. Os exemplos não são recriados ao reiniciar. A atualização do código sozinha não apaga bancos que estejam em outro computador: use essas ações na instalação correspondente.
+
+## Login administrativo único e correções de sincronização
+
+Existem apenas os perfis **administrador** e **técnico**. O único login administrativo padrão é `admin@slcampo.local`; não há mais login de gestor. A senha do administrador existente é preservada na atualização. O banco permite somente um administrador ativo; o cadastro de novos usuários cria técnicos. O administrador também pode ser o responsável por um atendimento, sem criar um técnico fictício.
+
+Na atualização, contas antigas de gestor e administradores adicionais são desativadas e vinculadas ao administrador principal. Suas referências em históricos são preservadas, as sessões antigas são revogadas e os dados das OS não são apagados. Ao entrar com o administrador, os rascunhos locais da conta antiga são recuperados automaticamente. Se já houver outro rascunho pendente para a mesma OS, a segunda cópia fica preservada para exportação em Configurações.
+
+Uma OS criada offline pode chegar ao servidor já com visita, peças e laudo preenchidos. Essa primeira sincronização é validada sem exigir que o cliente envie antes uma versão vazia. Rascunhos bloqueados pelos antigos avisos genéricos tentam novamente uma vez após atualizar. Fotografias grandes são comprimidas progressivamente antes do envio e, se houver outro campo inválido, o aviso informa qual campo corrigir. Os campos de medições elétricas e teste de bateria foram removidos do formulário e do PDF; dados antigos desses campos permanecem compatíveis no histórico bruto.
+
+Cada OS possui o botão **Excluir atendimento**, visível somente ao administrador. A API também verifica essa permissão. A exclusão funciona inclusive para um rascunho ainda não enviado, é comunicada aos outros aparelhos e não exclui outras OS. A limpeza em lote continua disponível em Configurações.
+
+Os comandos `npm run test:browser`, `npm run test:realtime`, `npm run test:lan` e `npm run test:requests` usam banco temporário e portas 5191/5192 (o teste LAN também usa 5188), sem preencher ou limpar o banco da operação. Requerem Python, Playwright e Chromium conforme a seção de testes. `test:requests` reproduz os avisos reportados, a recuperação da conta antiga, a criação offline, a compressão de foto grande e a exclusão individual por perfil.

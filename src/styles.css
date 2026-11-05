@@ -3264,3 +3264,10 @@ label {
   border-color: #e7c8c0;
   background: #fff8f6;
 }
+
+.heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}

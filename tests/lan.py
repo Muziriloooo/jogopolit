@@ -39,7 +39,7 @@ with tempfile.TemporaryDirectory() as tmp:
    for page in [computer,phone]:page.on('pageerror',lambda e:(errors.append(str(e)),print('JS ERROR:',str(e))))
    def login(page,url,email):
     response=page.goto(url);print('Origin',url,'HTTP',response.status);page.get_by_label('E-mail corporativo').fill(email);page.get_by_label('Senha',exact=True).fill('Campo-demo-2026!');page.get_by_role('button',name='Entrar no SL Campo').click();expect(page.get_by_role('heading',name='Olá,')).to_be_visible();expect(page.get_by_text('Shopping Maia',exact=True).first).to_be_visible(timeout=20000)
-   login(computer,f'http://127.0.0.1:{PORT}','gestor@slcampo.local')
+   login(computer,f'http://127.0.0.1:{PORT}','admin@slcampo.local')
    login(phone,f'http://{LAN}:{PORT}','tecnico@slcampo.local')
    assert phone.evaluate('window.isSecureContext') is False
    assert phone.evaluate('typeof crypto.randomUUID')=='undefined'

@@ -16,6 +16,19 @@ export type Exchange = {
 export async function exchangeOrders(io: Exchange): Promise<string[]> {
   const issues: string[] = [];
   await io.flush();
+  // Retry the old generic validation failures once after this compatibility fix.
+  for (const record of io.records()) {
+    if (
+      record.pending &&
+      record.error &&
+      record.recoveryVersion !== 2 &&
+      /Nova OS deve começar pendente|Dados inválidos\. Revise os campos e limites de imagens/.test(
+        record.error,
+      )
+    ) {
+      await io.put({ ...record, error: undefined, recoveryVersion: 2 });
+    }
+  }
   if (io.deleted && io.remove) {
     const deleted = new Set(await io.deleted());
     for (const record of io.records())
@@ -37,7 +50,8 @@ export async function exchangeOrders(io: Exchange): Promise<string[]> {
       if (!current.inFlight) await io.put({ ...current, inFlight: flight });
       try {
         const ack = await io.send(flight);
-        const latest = io.records().find((r) => r.data.id === id)!;
+        const latest = io.records().find((r) => r.data.id === id);
+        if (!latest) break;
         await io.put(
           latest.commandId === flight.commandId
             ? { ...ack, pending: false }
@@ -49,7 +63,8 @@ export async function exchangeOrders(io: Exchange): Promise<string[]> {
           await io.remove(id);
           break;
         }
-        const latest = io.records().find((r) => r.data.id === id)!;
+        const latest = io.records().find((r) => r.data.id === id);
+        if (!latest) break;
         if (error.status === 409 && latest.baseData) {
           try {
             const remote = (await io.pull()).find((r) => r.data.id === id);

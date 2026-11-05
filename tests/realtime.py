@@ -10,7 +10,7 @@ with sync_playwright() as p:
  for page in [computer,phone]:page.on('pageerror',lambda e:errors.append(str(e)))
  def login(page,email):
   page.goto(URL);page.get_by_label('E-mail corporativo').fill(email);page.get_by_label('Senha',exact=True).fill('Campo-demo-2026!');page.get_by_role('button',name='Entrar no SL Campo').click();expect(page.get_by_text('Shopping Maia',exact=True).first).to_be_visible(timeout=20000);expect(page.get_by_text('Atualizações em tempo real',exact=False)).to_be_visible(timeout=10000)
- login(computer,'gestor@slcampo.local');login(phone,'tecnico@slcampo.local')
+ login(computer,'admin@slcampo.local');login(phone,'tecnico@slcampo.local')
  computer.get_by_role('button',name='Nova ordem de serviço').click()
  for label,value in [('Número da OS *',ORDER),('Cliente *','Cliente tempo real'),('Unidade *','Unidade tempo real'),('Equipamento *','Lavadora tempo real')]:computer.get_by_label(label,exact=True).fill(value)
  computer.locator('select[name=technicianId]').select_option('tec-demo');computer.get_by_role('button',name='Criar ordem de serviço').click()

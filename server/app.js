@@ -5,7 +5,13 @@ import bcrypt from 'bcryptjs';
 import { randomBytes, createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { example } from './seed.js';
-import { orderSchema, sanitize, validateTransition } from './domain.js';
+import {
+  orderSchema,
+  sanitize,
+  validateTransition,
+  validateInitialOrder,
+  validationMessage,
+} from './domain.js';
 const hash = (s) => createHash('sha256').update(s).digest('hex');
 export async function createApp(db) {
   const app = express();
@@ -41,25 +47,24 @@ export async function createApp(db) {
       if (!process.env.DEMO_PASSWORD || process.env.DEMO_PASSWORD.length < 12)
         throw Error('Defina DEMO_PASSWORD com pelo menos 12 caracteres.');
       for (const [id, name, email, role] of [
-        ['gest-demo', 'Marina Costa', 'gestor@slcampo.local', 'gestor'],
         ['adm-demo', 'Administrador', 'admin@slcampo.local', 'admin'],
       ])
-        await db.query('INSERT INTO users VALUES ($1,$2,$3,$4,$5)', [
-          id,
-          name,
-          email,
-          await bcrypt.hash(process.env.DEMO_PASSWORD, 12),
-          role,
-        ]);
+        await db.query(
+          'INSERT INTO users(id,name,email,password_hash,role) VALUES ($1,$2,$3,$4,$5)',
+          [id, name, email, await bcrypt.hash(process.env.DEMO_PASSWORD, 12), role],
+        );
       // Examples are opt-in for isolated automated tests, never the default installation.
       if (process.env.DEMO_SEED_EXAMPLES === 'true') {
-        await db.query('INSERT INTO users VALUES($1,$2,$3,$4,$5)', [
-          'tec-demo',
-          'Lucas Ferreira',
-          'tecnico@slcampo.local',
-          await bcrypt.hash(process.env.DEMO_PASSWORD, 12),
-          'tecnico',
-        ]);
+        await db.query(
+          'INSERT INTO users(id,name,email,password_hash,role) VALUES($1,$2,$3,$4,$5)',
+          [
+            'tec-demo',
+            'Lucas Ferreira',
+            'tecnico@slcampo.local',
+            await bcrypt.hash(process.env.DEMO_PASSWORD, 12),
+            'tecnico',
+          ],
+        );
         const o = example();
         await db.query('INSERT INTO orders(id,technician_id,data) VALUES($1,$2,$3)', [
           o.id,
@@ -70,7 +75,7 @@ export async function createApp(db) {
     } else {
       if (!process.env.ADMIN_EMAIL || process.env.ADMIN_PASSWORD?.length < 12)
         throw Error('Configure ADMIN_EMAIL e ADMIN_PASSWORD (12+ caracteres).');
-      await db.query('INSERT INTO users VALUES($1,$2,$3,$4,$5)', [
+      await db.query('INSERT INTO users(id,name,email,password_hash,role) VALUES($1,$2,$3,$4,$5)', [
         'admin',
         'Administrador',
         process.env.ADMIN_EMAIL,
@@ -109,7 +114,9 @@ export async function createApp(db) {
         if (typeof email !== 'string' || typeof password !== 'string' || password.length > 200)
           return res.status(400).json({ error: 'Informe e-mail e senha.' });
         const result = await serial(() =>
-          db.query('SELECT * FROM users WHERE email=$1', [email.toLowerCase().trim()]),
+          db.query('SELECT * FROM users WHERE email=$1 AND disabled_at IS NULL', [
+            email.toLowerCase().trim(),
+          ]),
         );
         const u = result.rows[0];
         if (!u || !(await bcrypt.compare(password, u.password_hash)))
@@ -128,7 +135,16 @@ export async function createApp(db) {
           maxAge: 12 * 3600000,
           path: '/',
         });
-        res.json({ user: { id: u.id, name: u.name, email: u.email, role: u.role }, demo });
+        const aliases =
+          u.role === 'admin'
+            ? (
+                await serial(() => db.query('SELECT id FROM users WHERE merged_into=$1', [u.id]))
+              ).rows.map((row) => row.id)
+            : [];
+        res.json({
+          user: { id: u.id, name: u.name, email: u.email, role: u.role, mergedUserIds: aliases },
+          demo,
+        });
       } catch {
         res.status(500).json({ error: 'Não foi possível entrar.' });
       }
@@ -144,7 +160,7 @@ export async function createApp(db) {
     try {
       const r = await serial(() =>
         db.query(
-          'SELECT u.id,u.name,u.email,u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now()',
+          'SELECT u.id,u.name,u.email,u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.disabled_at IS NULL',
           [hash(token)],
         ),
       );
@@ -159,7 +175,15 @@ export async function createApp(db) {
       res.status(503).json({ error: 'Banco indisponível.' });
     }
   });
-  app.get('/api/me', (req, res) => res.json({ user: req.user, demo }));
+  app.get('/api/me', async (req, res) => {
+    const aliases =
+      req.user.role === 'admin'
+        ? (
+            await serial(() => db.query('SELECT id FROM users WHERE merged_into=$1', [req.user.id]))
+          ).rows.map((row) => row.id)
+        : [];
+    res.json({ user: { ...req.user, mergedUserIds: aliases }, demo });
+  });
   app.post('/api/logout', async (req, res) => {
     await serial(() => db.query('DELETE FROM sessions WHERE token_hash=$1', [hash(req.token)]));
     res.clearCookie('sl_session');
@@ -169,7 +193,9 @@ export async function createApp(db) {
     res.json(
       (
         await serial(() =>
-          db.query("SELECT id,name,role FROM users WHERE role='tecnico' ORDER BY name"),
+          db.query(
+            "SELECT id,name,role FROM users WHERE role='tecnico' AND disabled_at IS NULL ORDER BY name",
+          ),
         )
       ).rows,
     ),
@@ -177,19 +203,14 @@ export async function createApp(db) {
   app.post('/api/users', async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Apenas administrador.' });
     const { name, email, password, role } = req.body;
-    if (
-      !name ||
-      !/^\S+@\S+\.\S+$/.test(email) ||
-      password?.length < 12 ||
-      !['tecnico', 'gestor', 'admin'].includes(role)
-    )
-      return res
-        .status(400)
-        .json({ error: 'Nome, e-mail, perfil e senha de 12+ caracteres são obrigatórios.' });
+    if (!name || !/^\S+@\S+\.\S+$/.test(email) || password?.length < 12 || role !== 'tecnico')
+      return res.status(400).json({
+        error: 'Informe nome, e-mail e senha de 12+ caracteres para cadastrar um técnico.',
+      });
     try {
       const passwordHash = await bcrypt.hash(password, 12);
       await serial(() =>
-        db.query('INSERT INTO users VALUES($1,$2,$3,$4,$5)', [
+        db.query('INSERT INTO users(id,name,email,password_hash,role) VALUES($1,$2,$3,$4,$5)', [
           crypto.randomUUID(),
           name,
           email.toLowerCase(),
@@ -320,11 +341,16 @@ export async function createApp(db) {
     );
     res.json(result.rows.map((row) => row.id));
   });
-  app.delete('/api/orders', async (req, res) => {
+  const deleteOrders = async (req, res) => {
     if (req.user.role !== 'admin')
-      return res
-        .status(403)
-        .json({ error: 'Somente o administrador pode excluir todos os chamados.' });
+      return res.status(403).json({ error: 'Somente o administrador pode excluir atendimentos.' });
+    const requested = req.params.id ? [req.params.id] : req.body?.ids || [];
+    if (
+      !Array.isArray(requested) ||
+      requested.length > 1000 ||
+      requested.some((id) => typeof id !== 'string' || !/^[a-zA-Z0-9-]{1,50}$/.test(id))
+    )
+      return res.status(400).json({ error: 'Identificação de atendimento inválida.' });
     try {
       const removed = await serial(async () => {
         await db.exec('BEGIN');
@@ -333,7 +359,16 @@ export async function createApp(db) {
             "SELECT set_config('app.role',$1,true),set_config('app.user_id',$2,true)",
             [req.user.role, req.user.id],
           );
-          const rows = (await db.query('SELECT id,technician_id FROM orders FOR UPDATE')).rows;
+          const rows = (
+            await db.query(
+              req.params.id
+                ? 'SELECT id,technician_id FROM orders WHERE id=$1 FOR UPDATE'
+                : 'SELECT id,technician_id FROM orders FOR UPDATE',
+              req.params.id ? [req.params.id] : [],
+            )
+          ).rows;
+          for (const id of requested)
+            if (!rows.some((row) => row.id === id)) rows.push({ id, technician_id: req.user.id });
           const ids = rows.map((row) => row.id);
           for (const row of rows)
             await db.query(
@@ -369,7 +404,9 @@ export async function createApp(db) {
           'Não foi possível excluir os chamados. Nenhum registro foi alterado; tente novamente.',
       });
     }
-  });
+  };
+  app.delete('/api/orders', deleteOrders);
+  app.delete('/api/orders/:id', deleteOrders);
   app.get('/api/orders', async (req, res) => {
     const r = await actorQuery(
       req.user,
@@ -422,8 +459,17 @@ export async function createApp(db) {
             commandId,
           ]);
           if (cached.rows.length) {
-            if (cached.rows[0].user_id !== user.id)
-              throw Error('Comando pertence a outro usuário.');
+            if (cached.rows[0].user_id !== user.id) {
+              const merged =
+                user.role === 'admin' &&
+                (
+                  await db.query(
+                    'SELECT id FROM users WHERE id=$1 AND merged_into=$2 AND disabled_at IS NOT NULL',
+                    [cached.rows[0].user_id, user.id],
+                  )
+                ).rows.length;
+              if (!merged) throw Error('Comando pertence a outro usuário.');
+            }
             await db.exec('COMMIT');
             return cached.rows[0].result;
           }
@@ -431,7 +477,7 @@ export async function createApp(db) {
           const prev = r.rows[0];
           if (prev && user.role === 'tecnico' && prev.technician_id !== user.id)
             throw Error('OS não atribuída a você.');
-          if (!prev && user.role === 'tecnico') throw Error('Somente gestor cadastra OS.');
+          if (!prev && user.role === 'tecnico') throw Error('Somente o administrador cadastra OS.');
           if ((prev?.revision || 0) !== baseRevision) {
             await db.exec('ROLLBACK');
             return { conflict: true, revision: prev?.revision || 0 };
@@ -444,8 +490,7 @@ export async function createApp(db) {
               }
             next = validateTransition(next, prev.data, user);
           } else {
-            if (next.visits.length || next.parts.length || next.status !== 'Pendente')
-              throw Error('Nova OS deve começar pendente e sem visitas ou peças.');
+            next = validateInitialOrder(next, user);
           }
           const revision = baseRevision + 1;
           if (prev)
@@ -521,7 +566,7 @@ export async function createApp(db) {
         error: databaseUnavailable
           ? 'Banco temporariamente indisponível. Os registros continuam na fila para nova tentativa.'
           : e.name === 'ZodError'
-            ? 'Dados inválidos. Revise os campos e limites de imagens.'
+            ? validationMessage(e)
             : e.message,
       });
     }

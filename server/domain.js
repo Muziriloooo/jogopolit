@@ -11,17 +11,17 @@ const visit = z.object({
   checkIn: z.iso.datetime({ offset: true }),
   checkOut: z.iso.datetime({ offset: true }).optional(),
   hours: z.number().min(0),
-  defect: z.string().max(5000),
-  diagnosis: z.string().max(5000),
-  services: z.string().max(5000),
+  defect: z.string().max(5000).default(''),
+  diagnosis: z.string().max(5000).default(''),
+  services: z.string().max(5000).default(''),
   operational: z.boolean(),
   misuse: z.boolean(),
-  misuseNotes: z.string().max(5000),
+  misuseNotes: z.string().max(5000).default(''),
   returnNeeded: z.boolean(),
-  notes: z.string().max(5000),
-  voltage: z.string().max(500),
-  battery: z.string().max(1000),
-  mechanical: z.string().max(1000),
+  notes: z.string().max(5000).default(''),
+  voltage: z.string().max(500).optional(),
+  battery: z.string().max(1000).optional(),
+  mechanical: z.string().max(1000).default(''),
   photos: z
     .array(
       z.object({
@@ -32,10 +32,10 @@ const visit = z.object({
       }),
     )
     .max(16),
-  signature: image.nullable(),
-  signatureReason: z.string().max(1000),
-  signer: z.string().max(150),
-  signerRole: z.string().max(150),
+  signature: image.nullable().default(null),
+  signatureReason: z.string().max(1000).default(''),
+  signer: z.string().max(150).default(''),
+  signerRole: z.string().max(150).default(''),
   signatureMode: z.enum(['Assinada', 'Ausente', 'Recusa']),
   signedAt: z.string().optional(),
   geo: z
@@ -48,15 +48,15 @@ const visit = z.object({
 });
 export const orderSchema = z.object({
   id: z.string().regex(/^[a-zA-Z0-9-]{1,50}$/),
-  supplierOrder: z.string().max(50),
+  supplierOrder: z.string().max(50).default(''),
   client: z.string().min(1).max(150),
   unit: z.string().min(1).max(150),
-  address: z.string().max(500),
+  address: z.string().max(500).default(''),
   equipment: z.string().min(1).max(150),
-  brand: z.string().max(100),
-  model: z.string().max(100),
-  serial: z.string().max(100),
-  asset: z.string().max(100),
+  brand: z.string().max(150).default(''),
+  model: z.string().max(150).default(''),
+  serial: z.string().max(150).default(''),
+  asset: z.string().max(150).default(''),
   hours: z.number().min(0),
   type: z.enum(['Preventiva', 'Corretiva']),
   priority: z.enum(['Baixa', 'Média', 'Alta', 'Urgente']),
@@ -73,8 +73,8 @@ export const orderSchema = z.object({
         quantity: z.number().int().min(1).max(10000),
         unitCents: z.number().int().min(0).max(100000000).optional(),
         status: z.enum(['Solicitada', 'Aprovada', 'Entregue', 'Instalada']),
-        supplier: z.string().max(150),
-        compatible: z.string().max(150),
+        supplier: z.string().max(150).default(''),
+        compatible: z.string().max(150).default(''),
         installedVisitId: z.string().optional(),
       }),
     )
@@ -83,7 +83,7 @@ export const orderSchema = z.object({
   laborCents: z.number().int().nonnegative().optional(),
   travelCents: z.number().int().nonnegative().optional(),
   extraCents: z.number().int().nonnegative().optional(),
-  referenceNote: z.string().max(1000),
+  referenceNote: z.string().max(1000).default(''),
 });
 export function sanitize(order, role) {
   const copy = structuredClone(order);
@@ -95,7 +95,7 @@ export function sanitize(order, role) {
   }
   return copy;
 }
-export function validateTransition(next, previous, user) {
+export function validateTransition(next, previous, user, { initial = false } = {}) {
   if (user.role === 'tecnico') {
     for (const key of [
       'technicianId',
@@ -108,7 +108,7 @@ export function validateTransition(next, previous, user) {
       'supplierOrder',
     ])
       if (next[key] !== previous[key])
-        throw Error('Somente o gestor altera identificação e atribuição.');
+        throw Error('Somente o administrador altera identificação e atribuição.');
     next.laborCents = previous.laborCents;
     next.travelCents = previous.travelCents;
     next.extraCents = previous.extraCents;
@@ -123,7 +123,7 @@ export function validateTransition(next, previous, user) {
         if (p.code !== old.code || p.quantity !== old.quantity || p.description !== old.description)
           throw Error('Não altere uma solicitação registrada.');
         if (p.status !== old.status && !(old.status === 'Entregue' && p.status === 'Instalada'))
-          throw Error('Aprovação e entrega exigem gestor.');
+          throw Error('Aprovação e entrega exigem administrador.');
       }
     }
   }
@@ -131,12 +131,23 @@ export function validateTransition(next, previous, user) {
     const old = previous?.parts.find((x) => x.id === p.id);
     if (old?.status === 'Instalada' && !isDeepStrictEqual(p, old))
       throw Error('Instalação registrada é imutável.');
-    if (p.status === 'Instalada' && old?.status !== 'Instalada' && old?.status !== 'Entregue')
-      throw Error('Somente peças entregues podem ser instaladas.');
     if (
+      !initial &&
       p.status === 'Instalada' &&
       old?.status !== 'Instalada' &&
-      !next.visits.some((v) => v.id === p.installedVisitId && !v.checkOut)
+      old?.status !== 'Entregue'
+    )
+      throw Error('Somente peças entregues podem ser instaladas.');
+    if (
+      !initial &&
+      p.status === 'Instalada' &&
+      old?.status !== 'Instalada' &&
+      !next.visits.some(
+        (v) =>
+          v.id === p.installedVisitId &&
+          (!v.checkOut ||
+            previous.visits.some((oldVisit) => oldVisit.id === v.id && !oldVisit.checkOut)),
+      )
     )
       throw Error('Instale durante uma visita em andamento.');
     if (p.status === 'Instalada' && !next.visits.some((v) => v.id === p.installedVisitId))
@@ -187,4 +198,55 @@ export function validateTransition(next, previous, user) {
   )
     throw Error('Há visita, retorno ou peças pendentes.');
   return next;
+}
+
+/** A new OS may already contain a locally completed visit before its first upload. */
+export function validateInitialOrder(order, user) {
+  if (user.role !== 'admin') throw Error('Somente o administrador cadastra OS.');
+  const empty = { ...order, status: 'Pendente', parts: [], visits: [] };
+  return validateTransition(order, empty, user, { initial: true });
+}
+export function validationMessage(error) {
+  const issue = error.issues?.[0];
+  if (!issue) return 'Revise os dados deste atendimento.';
+  const labels = {
+    id: 'Número da OS',
+    client: 'Cliente',
+    unit: 'Unidade',
+    equipment: 'Equipamento',
+    hours: 'Horímetro',
+    quantity: 'Quantidade',
+    photos: 'Fotografias',
+    data: 'Imagem',
+    caption: 'Legenda',
+    defect: 'Defeito relatado',
+    diagnosis: 'Diagnóstico',
+    services: 'Serviços realizados',
+    notes: 'Observações',
+    signature: 'Assinatura',
+    signer: 'Nome do responsável',
+    signerRole: 'Cargo',
+    mechanical: 'Verificações mecânicas',
+    brand: 'Marca',
+    model: 'Modelo',
+    serial: 'Número de série',
+    asset: 'Patrimônio',
+    technicianId: 'Responsável pelo atendimento',
+    checkIn: 'Data de chegada',
+    checkOut: 'Data de saída',
+    status: 'Situação',
+    priority: 'Prioridade',
+    signatureMode: 'Registro de assinatura',
+    category: 'Categoria da foto',
+    description: 'Descrição da peça',
+    code: 'Código da peça',
+    scheduled: 'Agendamento',
+    createdAt: 'Data de criação',
+  };
+  const path = issue.path || [];
+  const key = [...path].reverse().find((key) => typeof key === 'string' && labels[key]);
+  const label = labels[key] || 'Dados do atendimento';
+  if (issue.code === 'too_big')
+    return `${label}: limite de ${issue.maximum}${issue.origin === 'string' ? ' caracteres' : ''} excedido. Reduza esse campo e tente novamente.`;
+  return `${label}: valor inválido ou não preenchido. Corrija esse campo e tente novamente.`;
 }

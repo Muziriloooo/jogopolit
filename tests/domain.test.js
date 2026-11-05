@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { example } from '../server/seed.js';
 import { orderSchema, validateTransition, sanitize } from '../server/domain.js';
 const tech = { id: 'tec-demo', role: 'tecnico' },
-  manager = { role: 'gestor' };
+  manager = { role: 'admin' };
 test('referência: R$ 1.566,56 solicitados; nenhuma instalação; duração 153 min', () => {
   const o = orderSchema.parse(example());
   assert.equal(
@@ -31,7 +31,7 @@ test('técnico não aprova nem instala solicitação', () => {
   const o = example(),
     n = structuredClone(o);
   n.parts[0].status = 'Aprovada';
-  assert.throws(() => validateTransition(n, o, tech), /gestor/);
+  assert.throws(() => validateTransition(n, o, tech), /administrador/);
   n.parts[0].status = 'Instalada';
   assert.throws(() => validateTransition(n, o, manager), /entregues/);
 });
@@ -65,4 +65,25 @@ test('validação rejeita imagem externa e quantidade negativa', () => {
     { id: 'x', category: 'Antes', caption: '', data: 'https://example.com/foto.jpg' },
   ];
   assert.equal(orderSchema.safeParse(o).success, false);
+});
+test('campos elétricos antigos são opcionais e validação informa o campo incorreto', async () => {
+  const { validationMessage } = await import('../server/domain.js');
+  const data = example();
+  delete data.visits[0].voltage;
+  delete data.visits[0].battery;
+  assert.equal(orderSchema.safeParse(data).success, true);
+  data.hours = 'inválido';
+  const parsed = orderSchema.safeParse(data);
+  assert.equal(parsed.success, false);
+  assert.match(validationMessage(parsed.error), /Horímetro/);
+});
+test('instalação e saída enviadas juntas preservam a instalação feita durante visita aberta', () => {
+  const before = example();
+  before.parts[0].status = 'Entregue';
+  delete before.visits[0].checkOut;
+  const next = structuredClone(before);
+  next.parts[0].status = 'Instalada';
+  next.parts[0].installedVisitId = next.visits[0].id;
+  next.visits[0].checkOut = '2026-10-27T16:07:00-03:00';
+  assert.doesNotThrow(() => validateTransition(next, before, { role: 'admin' }));
 });

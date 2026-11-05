@@ -10,13 +10,14 @@
     "build": "tsc --noEmit && vite build && node server/precache.js",
     "start": "NODE_ENV=production node --env-file-if-exists=.env server/index.js",
     "test": "node --test --test-isolation=none tests/*.test.js",
-    "test:browser": "python3 tests/browser.py",
+    "test:browser": "python3 tests/run-browser-fixture.py tests/browser.py",
     "preview": "vite preview --host 0.0.0.0",
     "format": "prettier --write src server tooling tests/*.js public/*.js public/*.webmanifest *.json *.ts *.html README.md docs/*.md",
     "format:check": "prettier --check src server tooling tests/*.js public/*.js public/*.webmanifest *.json *.ts *.html README.md docs/*.md",
     "test:updates": "python3 tests/updates.py",
-    "test:lan": "python3 tests/lan.py",
-    "test:realtime": "python3 tests/realtime.py"
+    "test:lan": "python3 tests/run-browser-fixture.py tests/lan.py",
+    "test:realtime": "python3 tests/run-browser-fixture.py tests/realtime.py",
+    "test:requests": "python3 tests/run-browser-fixture.py tests/requests.py"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.14",

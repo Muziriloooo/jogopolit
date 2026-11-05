@@ -39,6 +39,7 @@ import { report, money, date } from './pdf';
 import { watchUpdates } from './updates';
 import { watchLocalUpdates } from './local-updates';
 import { createId } from './ids';
+import { migrateAccounts, recoveredDrafts, prepareOrderForSync } from './store';
 import { exchangeOrders } from './sync-engine';
 import './styles.css';
 const uid = createId;
@@ -107,7 +108,13 @@ function App() {
   const syncLock = useRef(false);
   const syncAgain = useRef(false);
   const deletedIds = useRef(new Set<string>());
-  const [deleting, setDeleting] = useState(false);
+  const [deleting, setDeletingState] = useState(false);
+  const deleteLock = useRef(false);
+  const setDeleting = (value: boolean) => {
+    deleteLock.current = value;
+    setDeletingState(value);
+  };
+  const [recoveredCount, setRecoveredCount] = useState(0);
   const syncNotice = useRef<string | undefined>(undefined);
   const localWrites = useRef(Promise.resolve());
   const replace = (rows: RecordOrder[]) => {
@@ -123,11 +130,11 @@ function App() {
       }
       try {
         const me = await api('/me');
-        if (!cached || cached.id !== me.user.id) {
-          await session(me.user);
-          replace(await load(me.user));
-          setUser(me.user);
-        }
+        await migrateAccounts(me.user);
+        await session(me.user);
+        replace(await load(me.user));
+        setRecoveredCount((await recoveredDrafts(me.user)).length);
+        setUser(me.user);
         setDemo(me.demo);
       } catch {}
       setBoot(false);
@@ -142,7 +149,7 @@ function App() {
     };
   }, []);
   async function sync() {
-    if (!user || !navigator.onLine || syncLock.current) return;
+    if (boot || !user || !navigator.onLine || syncLock.current || deleteLock.current) return;
     syncLock.current = true;
     setBusy(true);
     try {
@@ -166,7 +173,11 @@ function App() {
           localWrites.current = localWrites.current.then(() => save(user, record));
           await localWrites.current;
         },
-        send: (command) => api('/sync', { method: 'POST', body: JSON.stringify(command) }),
+        send: async (command) =>
+          api('/sync', {
+            method: 'POST',
+            body: JSON.stringify({ ...command, data: await prepareOrderForSync(command.data) }),
+          }),
         pull: () => api('/orders'),
         commit: async (merged) => {
           replace(merged);
@@ -209,7 +220,7 @@ function App() {
       const timer = setInterval(sync, live ? 30000 : 3000);
       return () => clearInterval(timer);
     }
-  }, [user?.id, online, live]);
+  }, [user?.id, online, live, boot]);
   useEffect(() => {
     if (!user || !online || loginNeeded) {
       setLive(false);
@@ -323,7 +334,29 @@ function App() {
     (o.laborCents || 0) +
     (o.travelCents || 0) +
     (o.extraCents || 0);
-  const manager = user?.role !== 'tecnico';
+  const manager = user?.role === 'admin';
+  const responsibleUsers =
+    user?.role === 'admin' ? [{ id: user.id, name: user.name, role: 'admin' }, ...users] : users;
+  async function deleteAttendance(id: string) {
+    if (!user || user.role !== 'admin' || !online || busy || deleting) return;
+    if (!confirm(`Excluir o atendimento #${id}, incluindo visitas, fotos, assinatura e peças?`))
+      return;
+    setDeleting(true);
+    try {
+      await localWrites.current;
+      await api('/orders/' + encodeURIComponent(id), { method: 'DELETE' });
+      deletedIds.current.add(id);
+      replace(ordersRef.current.filter((r) => r.data.id !== id));
+      localWrites.current = localWrites.current.then(() => removeOrder(user, id));
+      await localWrites.current;
+      setSelected((current) => (current === id ? undefined : current));
+      flash(`Atendimento #${id} excluído.`);
+    } catch (error: any) {
+      flash(error.message);
+    } finally {
+      setDeleting(false);
+    }
+  }
   async function logout() {
     if (pending) {
       flash('Sincronize ou exporte os rascunhos antes de sair.');
@@ -352,12 +385,14 @@ function App() {
     return (
       <Login
         onLogin={async (u, d) => {
-          if (user && u.id !== user.id && pending) {
+          if (user && u.id !== user.id && pending && !u.mergedUserIds?.includes(user.id)) {
             flash('Entre com a mesma conta para preservar seus rascunhos.');
             return;
           }
+          await migrateAccounts(u);
           await session(u);
           replace(await load(u));
+          setRecoveredCount((await recoveredDrafts(u)).length);
           setDemo(d);
           setLoginNeeded(false);
           setUser(u);
@@ -417,7 +452,7 @@ function App() {
             </span>
             <span>
               <b>{user.name}</b>
-              <small>{manager ? 'Gestão de manutenção' : 'Técnico de manutenção'}</small>
+              <small>{manager ? 'Administrador' : 'Técnico de manutenção'}</small>
             </span>
             <LogOut size={17} />
           </button>
@@ -536,7 +571,19 @@ function App() {
                     {current.data.client} · {current.data.unit}
                   </p>
                 </div>
-                <Badge status={current.data.status} />
+                <div className="heading-actions">
+                  <Badge status={current.data.status} />
+                  {user.role === 'admin' && (
+                    <button
+                      className="btn danger"
+                      disabled={busy || deleting || !online}
+                      onClick={() => deleteAttendance(current.data.id)}
+                    >
+                      <Trash2 size={17} />
+                      Excluir atendimento
+                    </button>
+                  )}
+                </div>
               </div>
               {current.error && (
                 <div className="conflict">
@@ -615,7 +662,7 @@ function App() {
                         ['Agendamento', current.data.scheduled.split('-').reverse().join('/')],
                         [
                           'Responsável',
-                          users.find((u) => u.id === current.data.technicianId)?.name ||
+                          responsibleUsers.find((u) => u.id === current.data.technicianId)?.name ||
                             current.data.technicianId,
                         ],
                       ].map(([k, v]) => (
@@ -627,14 +674,14 @@ function App() {
                     </dl>
                     {manager && (
                       <label>
-                        Atribuir técnico
+                        Alterar responsável
                         <select
                           value={current.data.technicianId}
                           onChange={(e) =>
                             update({ ...current.data, technicianId: e.target.value })
                           }
                         >
-                          {users.map((u) => (
+                          {responsibleUsers.map((u) => (
                             <option key={u.id} value={u.id}>
                               {u.name}
                             </option>
@@ -679,8 +726,6 @@ function App() {
                                 misuseNotes: '',
                                 returnNeeded: false,
                                 notes: '',
-                                voltage: '',
-                                battery: '',
                                 mechanical: '',
                                 photos: [],
                                 signature: null,
@@ -1147,10 +1192,14 @@ function App() {
                         </div>
                         <div className="assignee">
                           <span className="avatar tiny">
-                            {(users.find((u) => u.id === o.technicianId)?.name || 'T')[0]}
+                            {
+                              (responsibleUsers.find((u) => u.id === o.technicianId)?.name ||
+                                'T')[0]
+                            }
                           </span>
                           <span>
-                            {users.find((u) => u.id === o.technicianId)?.name || o.technicianId}
+                            {responsibleUsers.find((u) => u.id === o.technicianId)?.name ||
+                              o.technicianId}
                           </span>
                         </div>
                         <ChevronRight size={18} />
@@ -1401,6 +1450,28 @@ function App() {
                     <Download size={17} />
                     Exportar registros deste dispositivo
                   </button>
+                  {recoveredCount > 0 && (
+                    <div className="info-note">
+                      <p>
+                        {recoveredCount} rascunhos da conta administrativa anterior foram
+                        preservados separadamente porque havia outra edição da mesma OS.
+                      </p>
+                      <button
+                        className="btn"
+                        onClick={async () =>
+                          download(
+                            new Blob(
+                              [JSON.stringify({ version: 1, orders: await recoveredDrafts(user) })],
+                              { type: 'application/json' },
+                            ),
+                            'SL-Campo-rascunhos-recuperados.json',
+                          )
+                        }
+                      >
+                        Exportar rascunhos recuperados
+                      </button>
+                    </div>
+                  )}
                   <h3>Restaurar rascunho</h3>
                   <p>
                     Importe um rascunho da mesma conta. A versão será validada pelo servidor na
@@ -1446,7 +1517,7 @@ function App() {
                       </p>
                       <button
                         className="btn danger"
-                        disabled={busy || deleting || !online || pending > 0 || orders.length === 0}
+                        disabled={busy || deleting || !online || orders.length === 0}
                         onClick={async () => {
                           if (
                             !confirm(
@@ -1457,7 +1528,12 @@ function App() {
                           setDeleting(true);
                           try {
                             await localWrites.current;
-                            const result = await api('/orders', { method: 'DELETE' });
+                            const result = await api('/orders', {
+                              method: 'DELETE',
+                              body: JSON.stringify({
+                                ids: ordersRef.current.map((r) => r.data.id),
+                              }),
+                            });
                             for (const id of result.ids) {
                               deletedIds.current.add(id);
                               localWrites.current = localWrites.current.then(() =>
@@ -1482,15 +1558,14 @@ function App() {
                         <Trash2 size={17} />
                         Excluir todos os chamados
                       </button>
-                      {pending > 0 && <p>Sincronize os registros pendentes antes de excluir.</p>}
                     </div>
                   )}
                   {user.role === 'admin' && (
                     <div className="delete-calls">
                       <h3>Excluir técnicos cadastrados</h3>
                       <p>
-                        Remove os técnicos, incluindo suas sessões de acesso. Administradores e
-                        gestores são preservados. Exclua ou redistribua os chamados antes.
+                        Remove os técnicos, incluindo suas sessões de acesso. O administrador é
+                        preservado. Exclua ou redistribua os chamados antes.
                       </p>
                       <button
                         className="btn danger"
@@ -1570,7 +1645,7 @@ function App() {
       </div>
       {modal && (
         <NewOrder
-          users={users}
+          users={responsibleUsers}
           close={() => setModal(false)}
           create={(o) => {
             if (deletedIds.current.has(o.id)) {
@@ -1970,10 +2045,6 @@ function VisitForm({
             {yesno('misuse', 'Existe evidência de mau uso?')}
             {text('misuseNotes', 'Evidências / descrição do mau uso', true)}
             {text('services', 'Quais serviços foram executados? *', true)}
-            <div className="form-grid">
-              {text('voltage', 'Medições elétricas (V / A)')}
-              {text('battery', 'Teste de bateria e resultado')}
-            </div>
             {text('mechanical', 'Verificações mecânicas e resultados', true)}
             {yesno('returnNeeded', 'Necessita retorno?')}
             {text('notes', 'Recomendações / observações', true)}
@@ -2098,7 +2169,7 @@ function VisitForm({
                 <b>Ao finalizar</b>
                 <p>
                   Registramos a saída e a duração. A OS continua aberta para peças, retorno ou
-                  encerramento pelo gestor.
+                  encerramento pelo administrador.
                 </p>
               </div>
             </div>
@@ -2577,8 +2648,8 @@ function NewOrder({
             </select>
           </label>
           <label>
-            Técnico responsável *
-            <select name="technicianId" required>
+            Responsável pelo atendimento *
+            <select name="technicianId" required defaultValue={users[0]?.id || ''}>
               <option value="">Selecione</option>
               {users.map((u) => (
                 <option value={u.id} key={u.id}>
@@ -2638,14 +2709,10 @@ function UserModal({ close, done }: { close: () => void; done: () => void }) {
             autoComplete="new-password"
           />
         </label>
-        <label>
-          Perfil
-          <select name="role">
-            <option value="tecnico">Técnico</option>
-            <option value="gestor">Gestor</option>
-            <option value="admin">Administrador</option>
-          </select>
-        </label>
+        <input type="hidden" name="role" value="tecnico" />
+        <p className="muted">
+          Perfil: técnico. O acesso administrativo utiliza o login único do administrador.
+        </p>
         {error && <p className="form-error">{error}</p>}
         <button className="btn primary full">Criar usuário</button>
       </form>

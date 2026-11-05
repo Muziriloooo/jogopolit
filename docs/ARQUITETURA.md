@@ -19,7 +19,7 @@ Não copiamos CPF, nomes de técnicos/responsáveis, contatos, fotos, assinatura
 
 ## Regras críticas
 
-Solicitada → Aprovada → Entregue → Instalada. Só gestor/admin aprovam e registram entrega. Instalação exige visita aberta e peça entregue. O técnico não recebe preços na API e não consegue aprovar por uma requisição manual. O servidor preserva preços quando recebe atualizações do técnico.
+Solicitada → Aprovada → Entregue → Instalada. Só o administrador aprova e registra entrega. Instalação exige visita aberta e peça entregue. O técnico não recebe preços na API e não consegue aprovar por uma requisição manual. O servidor preserva preços quando recebe atualizações do técnico.
 
 Visitas encerradas são imutáveis. A mesma OS admite novos retornos. Check-out exige diagnóstico, serviços e assinatura ou justificativa de ausência/recusa. Encerrar visita deixa a OS aberta. Encerrar OS exige ausência de peças e retornos pendentes. Não há cancelamento de solicitação nesta versão; registre solicitação somente após conferir os dados.
 
@@ -29,7 +29,7 @@ A fila envia após 600 ms sem nova edição. A rota SSE autenticada avisa os apa
 
 ## Segurança e implantação
 
-Um único grupo/organização, isolamento de ordens por técnico atribuído e visibilidade global somente para gestão/admin. Não é SaaS multiempresa. RLS adicional em orders; queries usam identidade de transação. Use papel de banco de aplicação não proprietário e sem BYPASSRLS em produção. Políticas SQL não substituem autorização da API. Credenciais do banco pertencem somente ao backend.
+Um único grupo/organização, isolamento de ordens por técnico atribuído e visibilidade global somente para administrador. Não é SaaS multiempresa. RLS adicional em orders; queries usam identidade de transação. Use papel de banco de aplicação não proprietário e sem BYPASSRLS em produção. Políticas SQL não substituem autorização da API. Credenciais do banco pertencem somente ao backend.
 
 Fotos/assinaturas são dados pessoais. Servir sob HTTPS, configurar retenção, base legal, transparência, controle de dispositivos, backups criptografados, monitoramento e processo de atendimento a titulares antes do uso real. Assinatura desenhada é registro de ciência; não é assinatura ICP-Brasil ou prova criptográfica de identidade. PDFs baixados ficam sob responsabilidade do usuário.
 
@@ -47,8 +47,16 @@ O modo Vite detecta mudanças de conteúdo em `src`, `server`, `public`, `toolin
 
 ## Inicialização vazia e exclusões administrativas
 
-Por padrão, a demonstração cria apenas administrador e gestor, sem técnico e sem chamados. A fixture 41250 permanece disponível aos testes por `DEMO_SEED_EXAMPLES=true`, opt-in para um banco isolado.
+Por padrão, a demonstração cria apenas o administrador, sem técnico e sem chamados. A fixture 41250 permanece disponível aos testes por `DEMO_SEED_EXAMPLES=true`, opt-in para um banco isolado.
 
 `DELETE /api/orders` é restrito a administrador, transacional e remove dados de atendimento e snapshots da tabela commands. `order_deletions` mantém somente ID, responsáveis e data da exclusão, sem fotos ou relatórios, para impedir recriação por sincronização antiga. O cliente consulta as exclusões antes de enviar sua fila e apaga também as entradas correspondentes do IndexedDB. Um envio antigo recebe HTTP 410.
 
-`DELETE /api/technicians` exige ausência de chamados atribuídos. Remove sessões, invalida o canal ao vivo desses usuários e preserva gestor/administrador. Nenhuma dessas ações executa automaticamente em bancos existentes só por atualizar o código.
+`DELETE /api/technicians` exige ausência de chamados atribuídos. Remove sessões, invalida o canal ao vivo desses usuários e preserva o administrador. Nenhuma dessas ações executa automaticamente em bancos existentes só por atualizar o código.
+
+## Unificação administrativa e compatibilidade
+
+`users.disabled_at` e `users.merged_into` preservam contas antigas para referências de auditoria, mas impedem login e revogam sessões. A migração escolhe o administrador existente (preferindo o padrão já conhecido), desativa os demais logins administrativos e converte o papel antigo gestor em administrador. Uma restrição única parcial impede mais de um administrador ativo. A API não cadastra outro administrador.
+
+O servidor só informa IDs de contas antigas vinculadas ao administrador autenticado. A migração do IndexedDB move esses rascunhos para a conta principal; versões concorrentes não são sobrescritas e podem ser exportadas. Não há redefinição de senha nem remoção de OS nessa migração.
+
+A validação inicial aceita snapshots de OS novas já preenchidas, mantendo as verificações de laudo, assinatura, retorno e referências de peças. Instalações registradas explicitamente pelo administrador em um histórico inicial são preservadas; solicitações nunca são promovidas automaticamente. Em OS existentes, a aprovação/entrega continua sendo exigida. Instalação e saída da visita podem chegar no mesmo envio se a visita estava aberta.

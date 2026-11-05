@@ -9,6 +9,6 @@ export default defineConfig({
     // HTTP polling works on Windows/Wi-Fi even when the HMR websocket is blocked.
     hmr: false,
     watch: { usePolling: true, interval: 500 },
-    proxy: { '/api': 'http://127.0.0.1:3001' },
+    proxy: { '/api': process.env.SL_API_TARGET || 'http://127.0.0.1:3001' },
   },
 });

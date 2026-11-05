@@ -1,5 +1,11 @@
-export type Role = 'tecnico' | 'gestor' | 'admin';
-export type User = { id: string; name: string; email: string; role: Role };
+export type Role = 'tecnico' | 'admin';
+export type User = {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  mergedUserIds?: string[];
+};
 export type Part = {
   id: string;
   code: string;
@@ -32,8 +38,8 @@ export type Visit = {
   misuseNotes: string;
   returnNeeded: boolean;
   notes: string;
-  voltage: string;
-  battery: string;
+  voltage?: string;
+  battery?: string;
   mechanical: string;
   photos: Photo[];
   signature: string | null;
@@ -73,6 +79,7 @@ export type RecordOrder = {
   data: Order;
   revision: number;
   pending?: boolean;
+  recoveryVersion?: number;
   commandId?: string;
   error?: string;
   baseData?: Order;

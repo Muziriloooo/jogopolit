@@ -10,7 +10,7 @@ const wait = async (predicate) => {
   }
   throw Error('Evento esperado não recebido');
 };
-test('tempo real autenticado avisa gestor e técnicos autorizados, inclusive reatribuição', async () => {
+test('tempo real autenticado avisa administrador e técnicos autorizados, inclusive reatribuição', async () => {
   process.env.DEMO_MODE = 'true';
   process.env.DEMO_SEED_EXAMPLES = 'true';
   process.env.DEMO_PASSWORD = 'Only-for-live-tests';
@@ -66,14 +66,14 @@ test('tempo real autenticado avisa gestor e técnicos autorizados, inclusive rea
     assert.equal((await fetch(base + '/api/events')).status, 401);
     const hash = (await db.query("SELECT password_hash FROM users WHERE id='tec-demo'")).rows[0]
       .password_hash;
-    await db.query('INSERT INTO users VALUES($1,$2,$3,$4,$5)', [
+    await db.query('INSERT INTO users(id,name,email,password_hash,role) VALUES($1,$2,$3,$4,$5)', [
       'other',
       'Outro',
       'other@test.local',
       hash,
       'tecnico',
     ]);
-    const boss = await login('gestor@slcampo.local'),
+    const boss = await login('admin@slcampo.local'),
       tech = await login('tecnico@slcampo.local'),
       other = await login('other@test.local');
     const bs = await open(boss),

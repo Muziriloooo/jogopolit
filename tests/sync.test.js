@@ -139,3 +139,26 @@ test('exclusão administrativa remove também rascunho local, sem reenviar', asy
   assert.deepEqual(f.local(), []);
   assert.equal(f.calls.length, 0);
 });
+test('rascunho com erro antigo de primeira sincronização é recuperado automaticamente', async () => {
+  const data = example();
+  data.id = '5544';
+  const f = fixture(
+    [
+      {
+        data,
+        revision: 0,
+        commandId: 'recover',
+        pending: true,
+        error: 'Nova OS deve começar pendente e sem visitas ou peças.',
+      },
+    ],
+    [],
+  );
+  let stored;
+  f.io.send = async (command) => (stored = { data: command.data, revision: 1 });
+  f.io.pull = async () => (stored ? [stored] : []);
+  await exchangeOrders(f.io);
+  assert.ok(!f.local().some((r) => r.pending));
+  assert.equal(f.local()[0].data.visits.length, data.visits.length);
+  assert.equal(f.local()[0].data.visits[0].diagnosis, data.visits[0].diagnosis);
+});

@@ -80,7 +80,7 @@ test('API: sessions, role isolation, no prices, idempotency, conflict and audit'
     assert.equal(audit.data.length, 1);
     const hash = (await db.query("SELECT password_hash FROM users WHERE id='tec-demo'")).rows[0]
       .password_hash;
-    await db.query('INSERT INTO users VALUES($1,$2,$3,$4,$5)', [
+    await db.query('INSERT INTO users(id,name,email,password_hash,role) VALUES($1,$2,$3,$4,$5)', [
       'other',
       'Outro técnico',
       'other@test.local',
@@ -98,7 +98,7 @@ test('API: sessions, role isolation, no prices, idempotency, conflict and audit'
       400,
     );
     const boss = await request('/login', 'POST', {
-      email: 'gestor@slcampo.local',
+      email: 'admin@slcampo.local',
       password: 'Only-for-tests-2026',
     });
     let managed = (await request('/orders', 'GET', undefined, boss.cookie)).data[0];

@@ -24,7 +24,7 @@ if not exist ".env.example" goto configuracao_ausente
 node -e "const fs=require('node:fs'); const s=fs.readFileSync('.env.example','utf8'); if(!/^DEMO_MODE=true\r?$/m.test(s)) process.exit(1); fs.writeFileSync('.env',s.replace(/^DEMO_PASSWORD=.*$/m,'DEMO_PASSWORD=Campo-demo-2026!'),{flag:'wx'});"
 if errorlevel 1 goto falha_configuracao
 echo Configuracao demonstrativa criada em .env.
-echo Contas iniciais: gestor@slcampo.local e admin@slcampo.local
+echo Login administrativo unico: admin@slcampo.local
 echo Senha demonstrativa: Campo-demo-2026!
 echo Use estas contas somente para demonstracao local.
 echo Se o banco ja existe, suas senhas anteriores permanecem validas.

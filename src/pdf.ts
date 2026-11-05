@@ -67,7 +67,6 @@ export function report(order: Order, user: User, kind: 'OS' | 'Relatório técni
     line('Defeito relatado', v.defect);
     line('Diagnóstico', v.diagnosis);
     line('Serviços executados', v.services);
-    line('Tensão / teste de bateria', v.voltage + ' / ' + v.battery);
     line('Verificações mecânicas', v.mechanical);
     line('Equipamento funcionando', v.operational ? 'Sim' : 'Não');
     line('Mau uso', v.misuse ? 'Sim · ' + v.misuseNotes : 'Não · ' + v.misuseNotes);
