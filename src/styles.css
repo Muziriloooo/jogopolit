@@ -1368,6 +1368,10 @@ textarea {
   width: 100%;
   height: 180px;
   touch-action: none;
+  overscroll-behavior: contain;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   background: #f7f8fd;
   cursor: crosshair;
 }

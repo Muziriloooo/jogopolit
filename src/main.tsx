@@ -2205,6 +2205,7 @@ function Signature({
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
+  const activePointer = useRef<number | undefined>(undefined);
   useEffect(() => {
     const c = canvas.current!,
       ctx = c.getContext('2d')!;
@@ -2215,14 +2216,118 @@ function Signature({
       img.src = value;
     }
   }, [value]);
-  function point(e: React.PointerEvent) {
-    const c = canvas.current!,
-      r = c.getBoundingClientRect();
-    return [
-      ((e.clientX - r.left) * c.width) / r.width,
-      ((e.clientY - r.top) * c.height) / r.height,
-    ];
-  }
+  useEffect(() => {
+    const c = canvas.current!;
+    const point = (clientX: number, clientY: number) => {
+      const r = c.getBoundingClientRect();
+      return [((clientX - r.left) * c.width) / r.width, ((clientY - r.top) * c.height) / r.height];
+    };
+    const start = (clientX: number, clientY: number) => {
+      drawing.current = true;
+      const [x, y] = point(clientX, clientY);
+      const ctx = c.getContext('2d')!;
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#132e2b';
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + 0.5, y + 0.5);
+      ctx.stroke();
+    };
+    const move = (clientX: number, clientY: number) => {
+      if (!drawing.current) return;
+      const [x, y] = point(clientX, clientY);
+      const ctx = c.getContext('2d')!;
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    };
+    const finish = () => {
+      if (!drawing.current) return;
+      drawing.current = false;
+      activePointer.current = undefined;
+      onChange(c.toDataURL('image/png'));
+    };
+    const pointerDown = (event: PointerEvent) => {
+      if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+      event.preventDefault();
+      activePointer.current = event.pointerId;
+      try {
+        c.setPointerCapture(event.pointerId);
+      } catch {
+        // Older Safari versions may reject capture; drawing still works inside the canvas.
+      }
+      start(event.clientX, event.clientY);
+    };
+    const pointerMove = (event: PointerEvent) => {
+      if (event.pointerId !== activePointer.current) return;
+      event.preventDefault();
+      const samples = event.getCoalescedEvents?.() || [event];
+      for (const sample of samples) move(sample.clientX, sample.clientY);
+    };
+    const pointerEnd = (event: PointerEvent) => {
+      if (event.pointerId !== activePointer.current) return;
+      event.preventDefault();
+      finish();
+    };
+    const touchStart = (event: TouchEvent) => {
+      if (event.touches.length !== 1) return;
+      event.preventDefault();
+      const touch = event.touches[0];
+      start(touch.clientX, touch.clientY);
+    };
+    const touchMove = (event: TouchEvent) => {
+      if (!drawing.current || !event.touches.length) return;
+      event.preventDefault();
+      const touch = event.touches[0];
+      move(touch.clientX, touch.clientY);
+    };
+    const touchEnd = (event: TouchEvent) => {
+      event.preventDefault();
+      finish();
+    };
+    const mouseDown = (event: MouseEvent) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      start(event.clientX, event.clientY);
+    };
+    const mouseMove = (event: MouseEvent) => {
+      if (!drawing.current) return;
+      event.preventDefault();
+      move(event.clientX, event.clientY);
+    };
+    const mouseUp = () => finish();
+    const supportsPointer = typeof (window as any).PointerEvent === 'function';
+    if (supportsPointer) {
+      c.addEventListener('pointerdown', pointerDown);
+      c.addEventListener('pointermove', pointerMove);
+      c.addEventListener('pointerup', pointerEnd);
+      c.addEventListener('pointercancel', pointerEnd);
+      c.addEventListener('lostpointercapture', finish);
+    } else {
+      c.addEventListener('touchstart', touchStart, { passive: false });
+      c.addEventListener('touchmove', touchMove, { passive: false });
+      c.addEventListener('touchend', touchEnd, { passive: false });
+      c.addEventListener('touchcancel', touchEnd, { passive: false });
+      c.addEventListener('mousedown', mouseDown);
+      window.addEventListener('mousemove', mouseMove);
+      window.addEventListener('mouseup', mouseUp);
+    }
+    return () => {
+      c.removeEventListener('pointerdown', pointerDown);
+      c.removeEventListener('pointermove', pointerMove);
+      c.removeEventListener('pointerup', pointerEnd);
+      c.removeEventListener('pointercancel', pointerEnd);
+      c.removeEventListener('lostpointercapture', finish);
+      c.removeEventListener('touchstart', touchStart);
+      c.removeEventListener('touchmove', touchMove);
+      c.removeEventListener('touchend', touchEnd);
+      c.removeEventListener('touchcancel', touchEnd);
+      c.removeEventListener('mousedown', mouseDown);
+      window.removeEventListener('mousemove', mouseMove);
+      window.removeEventListener('mouseup', mouseUp);
+    };
+  }, [onChange]);
   return (
     <div className="signature">
       <canvas
@@ -2230,43 +2335,14 @@ function Signature({
         width={900}
         height={300}
         aria-label="Desenhe a assinatura com o dedo"
-        onPointerDown={(e) => {
-          drawing.current = true;
-          e.currentTarget.setPointerCapture(e.pointerId);
-          const [x, y] = point(e);
-          const ctx = e.currentTarget.getContext('2d')!;
-          ctx.lineWidth = 3;
-          ctx.lineCap = 'round';
-          ctx.strokeStyle = '#132e2b';
-          ctx.beginPath();
-          ctx.moveTo(x, y);
-          ctx.lineTo(x + 0.5, y + 0.5);
-          ctx.stroke();
-        }}
-        onPointerMove={(e) => {
-          if (!drawing.current) return;
-          const [x, y] = point(e);
-          const ctx = e.currentTarget.getContext('2d')!;
-          ctx.lineTo(x, y);
-          ctx.stroke();
-        }}
-        onPointerUp={() => {
-          if (drawing.current) {
-            drawing.current = false;
-            onChange(canvas.current!.toDataURL('image/png'));
-          }
-        }}
-        onPointerCancel={() => {
-          drawing.current = false;
-          onChange(canvas.current!.toDataURL('image/png'));
-        }}
+        onContextMenu={(event) => event.preventDefault()}
       />
       <div>
         <span>
           <PenLine size={15} />
           Assine com o dedo na área acima
         </span>
-        <button className="text-link" onClick={() => onChange(null)}>
+        <button type="button" className="text-link" onClick={() => onChange(null)}>
           Limpar
         </button>
       </div>

@@ -6,7 +6,7 @@ ART=Path('test-results');ART.mkdir(exist_ok=True)
 ORDER='E2E-'+uuid.uuid4().hex[:8]
 with sync_playwright() as p:
  browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox','--disable-dev-shm-usage'])
- context=browser.new_context(viewport={'width':1440,'height':1000},accept_downloads=True)
+ context=browser.new_context(viewport={'width':1440,'height':1000},accept_downloads=True,has_touch=True)
  page=context.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
  def login(email):
   page.goto(BASE);page.get_by_label('E-mail corporativo').fill(email);page.get_by_label('Senha',exact=True).fill('Campo-demo-2026!');page.get_by_role('button',name='Entrar no SL Campo').click();expect(page.get_by_role('heading',name='Olá,')).to_be_visible();expect(page.get_by_text('Shopping Maia',exact=True).first).to_be_visible(timeout=20000)
@@ -38,7 +38,10 @@ with sync_playwright() as p:
  page.locator('.detail-tabs').get_by_role('button',name='Peças',exact=True).click();page.get_by_role('button',name='Solicitar peça',exact=True).click();page.locator('.inset-form select').select_option('MT13044');page.get_by_label('Quantidade',exact=True).fill('2');page.get_by_role('button',name='Salvar solicitação').click();expect(page.get_by_text('Solicitada',exact=True)).to_be_visible();page.locator('.detail-tabs').get_by_role('button',name='Atendimento',exact=True).click()
  for _ in range(3):page.get_by_role('button',name='Continuar',exact=True).click()
  page.get_by_label('Nome do responsável *',exact=True).fill('Responsável fictício');page.get_by_label('Cargo *',exact=True).fill('Supervisor')
- canvas=page.locator('canvas');box=canvas.bounding_box();page.mouse.move(box['x']+40,box['y']+65);page.mouse.down();page.mouse.move(box['x']+90,box['y']+100,steps=8);page.mouse.move(box['x']+150,box['y']+60,steps=8);page.mouse.up()
+ canvas=page.locator('canvas');box=canvas.bounding_box();cdp=context.new_cdp_session(page)
+ cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':box['x']+40,'y':box['y']+65,'id':1}]})
+ for x,y in [(65,80),(90,100),(120,85),(150,60)]:cdp.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':box['x']+x,'y':box['y']+y,'id':1}]})
+ cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})
  page.screenshot(path=str(ART/'assinatura-mobile.png'),full_page=True)
  page.get_by_role('button',name='Finalizar visita e registrar saída').click();expect(page.get_by_text('Visita 1 · Finalizada')).to_be_visible()
  page.get_by_role('button',name='Documentos',exact=True).click()
