@@ -1,2 +1,14 @@
 import { defineConfig } from 'vite';
-export default defineConfig({ server: { proxy: { '/api': 'http://127.0.0.1:3001' } } });
+import { localUpdates } from './tooling/local-version.js';
+export default defineConfig({
+  plugins: [localUpdates()],
+  server: {
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: true,
+    // HTTP polling works on Windows/Wi-Fi even when the HMR websocket is blocked.
+    hmr: false,
+    watch: { usePolling: true, interval: 500 },
+    proxy: { '/api': 'http://127.0.0.1:3001' },
+  },
+});

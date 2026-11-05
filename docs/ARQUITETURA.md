@@ -6,7 +6,7 @@ OS interna 41250 / OS fornecedor 4628, atendimento em 27/10/2026. Os dois PDFs f
 
 O relatório confirma aquecimento de baterias, excesso de água relatado, série apagada, horímetro de 7.493,8 h, equipamento funcionando, retorno necessário e nenhuma peça aplicada. Há oito produtos listados para solicitação, somando R$ 1.566,56, mão de obra de R$ 190,00 e deslocamento de R$ 13,60. Total registrado: R$ 1.770,16. Entrada 13:34, saída 16:07, 153 minutos. Os documentos diferem entre 0 km informado no relatório e 8 km na OS; não se presume distância medida. Horários detalhados com segundos constam no relatório; a demonstração usa os horários de minutos fornecidos no pedido.
 
-Não copiamos CPF, nomes de técnicos/responsáveis, contatos, fotos, assinaturas, links autenticados ou logotipo do fornecedor. A identidade visual é tipográfica, criada para esta aplicação, sem alegar ser uma marca oficial autorizada.
+Não copiamos CPF, nomes de técnicos/responsáveis, contatos, fotos, assinaturas, links autenticados ou logotipo do fornecedor. A identidade visual segue a captura de referência enviada pelo usuário: azul-marinho, azul royal, amarelo, branco, faixas diagonais e a mensagem “Cuidando do que importa”. O símbolo vetorial foi reconstruído a partir dessa referência, sem recursos remotos; para reprodução exata, substitua pelo arquivo oficial da marca.
 
 ## Componentes
 
@@ -40,3 +40,7 @@ Implementado: fluxo de OS e visitas, laudo por etapas, fotos, assinatura, catál
 Ainda exige operação de implantação: servidor HTTPS, PostgreSQL gerenciado ou administrado, estratégia de backup/restauração, senhas individuais e marca autorizada. Sem integração de WhatsApp/e-mail (PDF pode ser compartilhado pelo sistema do celular), push, estoque central, faturamento, recuperação de senha por e-mail, MFA ou gestão de dispositivos. Equipamentos são identificados dentro das OS; o painel lista registros por OS, sem cadastro mestre independente nem deduplicação de ativos entre OS. Indicadores por equipamento/unidade são valores registrados por atendimento, incluindo solicitações, não contabilidade de custos realizados. Os filtros aplicam-se à lista de ordens; indicadores de equipe refletem a operação inteira.
 
 Testes de navegador em Chromium cobrem layout móvel, mas não substituem homologação em aparelhos Android/iOS reais: câmera, permissões, instalação, armazenamento e compartilhamento de PDFs dependem do navegador e do sistema operacional. Não alegar compatibilidade perfeita antes dessa homologação.
+
+## Rede local e atualizações
+
+O modo Vite detecta mudanças de conteúdo em `src`, `server`, `public`, `tooling` e manifests selecionados. O endpoint de versão não lê `.env`, `.data` ou arquivos do Git e não retorna código-fonte. A aplicação consulta essa versão no mesmo endereço usado pelo dispositivo; reload aguarda o salvamento e condições de segurança. O modo publicado mantém o fluxo de service worker/HTTPS. Nenhum dos dois modos apaga IndexedDB. O gerador de UUID usa Web Crypto `getRandomValues` quando a API `randomUUID` está indisponível em origens HTTP por IP.

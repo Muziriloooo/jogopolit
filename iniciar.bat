@@ -44,7 +44,13 @@ if errorlevel 1 goto falha_instalacao
 echo.
 echo Iniciando a API e a interface do SL Campo...
 echo Aguarde o Vite informar o endereco e abra-o no navegador.
-echo Porta padrao da interface: 5173. Porta padrao da API: 3001.
+echo No computador: http://localhost:5173/
+echo No celular, conectado ao mesmo Wi-Fi, utilize um dos enderecos abaixo:
+node -e "const os=require('node:os'); for(const rows of Object.values(os.networkInterfaces())) for(const ip of rows||[]) if(ip.family==='IPv4' && !ip.internal) console.log('  http://'+ip.address+':5173/');"
+echo A atualizacao local e verificada automaticamente a cada 3 segundos.
+echo A porta 5173 e fixa: nao sera trocada silenciosamente por outra porta.
+echo Se o Windows perguntar, permita o acesso na rede privada.
+echo Para PWA offline, camera e localizacao no celular, use HTTPS.
 echo Mantenha esta janela aberta. Para encerrar, pressione Ctrl+C.
 echo Sua configuracao .env e o banco .data serao preservados.
 echo.

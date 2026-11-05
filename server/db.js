@@ -7,7 +7,14 @@ export async function database() {
   if (process.env.DATABASE_URL) {
     const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
     const client = await pool.connect();
-    db = { query: (...args) => client.query(...args), exec: (s) => client.query(s) };
+    db = {
+      query: (...args) => client.query(...args),
+      exec: (s) => client.query(s),
+      close: async () => {
+        client.release();
+        await pool.end();
+      },
+    };
   } else {
     const dir = process.env.DATA_DIR || '.data';
     await fs.mkdir(dir, { recursive: true });

@@ -85,9 +85,25 @@ PGlite local: pare a API antes de copiar `.data/postgres` integralmente; restaur
 - `public/sw.js` / `server/precache.js`: cache de build para offline.
 - `tests/`: regras, API e fluxo real de navegador.
 
-Não há logotipos oficiais incorporados; substitua a marca tipográfica apenas com arquivos autorizados.
+A marca vetorial foi reconstruída a partir da identidade visual enviada pelo usuário. Para fidelidade exata, substitua pelo arquivo oficial autorizado. Cores, faixas diagonais, ícones e PDFs seguem a referência azul, amarela e branca.
 
-## Atualização automática no computador e no celular
+## Atualização pela rede local (localhost e IP do computador)
+
+Este é o modo usado por `iniciar.bat`: computador em `http://localhost:5173/` e celular em `http://IP-DO-COMPUTADOR:5173/`, no mesmo Wi-Fi. A API e o banco são os do computador; não execute um segundo banco no celular.
+
+O iniciador mostra os IPs da máquina. A porta 5173 agora é fixa: se já estiver ocupada, a aplicação informa o erro em vez de subir silenciosamente em outra porta. Permita a porta 5173 somente na rede privada do Firewall do Windows. O celular não deve usar `localhost`, que se refere ao próprio aparelho. Se o roteador alterar o IP, utilize o novo endereço informado pelo iniciador.
+
+**Para receber esta correção pela primeira vez:** feche a janela anterior do sistema com `Ctrl+C`, atualize os arquivos (ou execute `atualizar.bat` se a pasta foi clonada com Git), execute `iniciar.bat` e recarregue a página uma vez em cada aparelho. Não apague `.env`, `.data` ou os dados do navegador. O atualizador preserva a configuração/banco e interrompe se houver alterações locais; exige Git e conexão com o GitHub. Cópias obtidas por ZIP precisam receber os novos arquivos manualmente, preservando os dados locais.
+
+Depois disso, alterações nos arquivos do projeto são detectadas no computador e no celular por consulta HTTP a cada **3 segundos**, sem depender do WebSocket do Vite ou de service worker. Isso também funciona no endereço HTTP por IP. O recarregamento espera o fim do preenchimento e a sincronização dos dados; um atendimento aberto na tela não é interrompido. Para aplicar a nova versão após preencher, sincronize e volte para a lista/início. Alterações de dados (OS, atribuições e laudos) continuam usando a sincronização da API: envio após aproximadamente 2 segundos e consulta de outros dispositivos a cada 15 segundos.
+
+A API agora reinicia automaticamente quando seus módulos são alterados, fechando o banco antes de reiniciar. Alterações de dependências e configuração ainda podem exigir parar e iniciar novamente. Enviar código para o GitHub não baixa arquivos automaticamente no seu computador: use `atualizar.bat` para isso.
+
+**Limite do HTTP no celular:** a atualização e o atendimento online funcionam na rede local, incluindo IDs compatíveis quando `crypto.randomUUID` não está disponível. Instalação PWA, service worker/offline, geolocalização e recursos de câmera que exigem contexto seguro precisam de HTTPS. Seleção de imagens pela galeria e assinatura por toque continuam disponíveis conforme o navegador. Essa limitação é do navegador, não deve ser contornada desativando proteções.
+
+Teste automatizado: com a API demonstrativa ativa, execute `npm run test:lan`. O teste usa duas origens de navegador e uma cópia isolada do código, confirma criação de OS no computador, recebimento no celular, check-in em HTTP inseguro, atualização de código e preservação do laudo. Neste ambiente de nuvem, um relay local simula a origem IP porque o proxy bloqueia tráfego LAN direto. Para testar uma rede real, use `SL_LAN_DIRECT=1 SL_LAN_HOST=IP-DA-MAQUINA python3 tests/lan.py` em ambiente autorizado; o servidor de teste usa a porta 5188.
+
+## Atualização automática do PWA publicado em HTTPS
 
 Ambos precisam acessar **o mesmo endereço HTTPS da mesma instalação**, com a mesma API e banco. Uma cópia local em cada dispositivo não compartilha dados automaticamente.
 

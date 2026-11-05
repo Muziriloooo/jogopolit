@@ -37,8 +37,10 @@ import type { Order, User, RecordOrder, Visit, Part } from './types';
 import { api, load, save, session, clearDevice, compress } from './store';
 import { report, money, date } from './pdf';
 import { watchUpdates } from './updates';
+import { watchLocalUpdates } from './local-updates';
+import { createId } from './ids';
 import './styles.css';
-const uid = () => crypto.randomUUID();
+const uid = createId;
 const day = () => new Date().toLocaleDateString('en-CA');
 const statuses = ['Todas', 'Pendente', 'Em andamento', 'Aguardando peças', 'Concluída'];
 function Badge({ status }: { status: string }) {
@@ -58,6 +60,16 @@ function Badge({ status }: { status: string }) {
       <i />
       {status}
     </span>
+  );
+}
+function Brand() {
+  return (
+    <>
+      <img className="brand-symbol" src="/souza-lima-symbol.svg" alt="" />
+      <span className="brand-wordmark">
+        SOUZA LIMA<small>SL CAMPO · MANUTENÇÃO</small>
+      </span>
+    </>
   );
 }
 function App() {
@@ -205,8 +217,9 @@ function App() {
     return () => clearTimeout(timer);
   }, [orders, user?.id, online]);
   useEffect(() => {
-    if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
-    return watchUpdates({
+    const watch = import.meta.env.DEV ? watchLocalUpdates : watchUpdates;
+    if (import.meta.env.PROD && !('serviceWorker' in navigator)) return;
+    return watch({
       safeToReload: () => updateSafe.current(),
       flush: () => localWrites.current,
       onWaiting: setUpdateWaiting,
@@ -322,13 +335,7 @@ function App() {
     <div className="app">
       <aside className={menu ? 'sidebar visible' : 'sidebar'}>
         <a className="brand" href="#" onClick={() => go('overview')}>
-          <span className="brand-mark">
-            SL
-            <ArrowUpRight size={16} />
-          </span>
-          <span>
-            SL Campo<small>GRUPO SOUZA LIMA</small>
-          </span>
+          <Brand />
         </a>
         <div className="workspace-tag">
           <span className="tiny-dot" /> Operação de manutenção <ChevronRight size={15} />
@@ -393,6 +400,10 @@ function App() {
             >
               <Menu />
             </button>
+            <span className="mobile-brand">
+              <img src="/souza-lima-symbol.svg" alt="" />
+              SL CAMPO
+            </span>
             <span>Operação</span>
             <ChevronRight size={14} />
             <strong>
@@ -869,13 +880,13 @@ function App() {
                         <span className="tiny-dot" /> VISÃO DA OPERAÇÃO
                       </span>
                       <h2>
-                        Menos imprevistos.
+                        Cuidando
                         <br />
-                        Mais operação.
+                        <span>do que importa.</span>
                       </h2>
                       <p>
-                        Planeje, acompanhe e registre cada manutenção
-                        <br className="desktop-only" /> com a confiança de ter tudo em um só lugar.
+                        Tecnologia e cuidado em cada atendimento.
+                        <br className="desktop-only" /> A manutenção da sua operação começa aqui.
                       </p>
                       <button onClick={() => go('orders')}>
                         Acompanhar atendimentos <ArrowUpRight size={18} />
@@ -1462,25 +1473,18 @@ function Login({ onLogin, notice }: { onLogin: (u: User, d: boolean) => void; no
     <div className="login-page">
       <section className="login-story">
         <a className="brand">
-          <span className="brand-mark">
-            SL
-            <ArrowUpRight size={16} />
-          </span>
-          <span>
-            SL Campo<small>GRUPO SOUZA LIMA</small>
-          </span>
+          <Brand />
         </a>
         <div>
           <span className="banner-kicker">GESTÃO DE MANUTENÇÃO</span>
           <h1>
-            Quem cuida da operação
+            Cuidando
             <br />
-            merece estar conectado.
+            <span>do que importa.</span>
           </h1>
           <p>
-            Do primeiro diagnóstico ao último detalhe.
-            <br />
-            Sua manutenção, em boas mãos.
+            Segurança. Facilities. Tecnologia.
+            <br />A excelência da Souza Lima, agora em campo.
           </p>
           <div className="login-features">
             <span>
@@ -1777,19 +1781,23 @@ function VisitForm({
                 <button
                   className="btn"
                   onClick={() =>
-                    navigator.geolocation?.getCurrentPosition(
-                      (p) =>
-                        set({
-                          geo: {
-                            lat: p.coords.latitude,
-                            lng: p.coords.longitude,
-                            accuracy: p.coords.accuracy,
-                          },
-                        }),
-                      () =>
-                        flash('Localização não autorizada ou indisponível. Continue normalmente.'),
-                      { enableHighAccuracy: true, timeout: 12000 },
-                    )
+                    !navigator.geolocation
+                      ? flash('A localização exige HTTPS no celular. Você pode continuar sem ela.')
+                      : navigator.geolocation.getCurrentPosition(
+                          (p) =>
+                            set({
+                              geo: {
+                                lat: p.coords.latitude,
+                                lng: p.coords.longitude,
+                                accuracy: p.coords.accuracy,
+                              },
+                            }),
+                          () =>
+                            flash(
+                              'Localização não autorizada ou indisponível. Continue normalmente.',
+                            ),
+                          { enableHighAccuracy: true, timeout: 12000 },
+                        )
                   }
                 >
                   Autorizar e registrar localização

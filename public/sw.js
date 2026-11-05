@@ -1,7 +1,9 @@
 const CACHE = 'sl-campo-v1';
 self.addEventListener('install', (event) =>
   event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(['/', '/icon.svg', '/manifest.webmanifest'])),
+    caches
+      .open(CACHE)
+      .then((c) => c.addAll(['/', '/icon.svg', '/souza-lima-symbol.svg', '/manifest.webmanifest'])),
   ),
 );
 self.addEventListener('message', (event) => {

@@ -25,15 +25,17 @@ export function report(order: Order, user: User, kind: 'OS' | 'Relatório técni
   const title = (s: string) => {
     if (y > 260) page();
     y += 5;
-    pdf.setTextColor(25, 65, 56);
+    pdf.setTextColor(0, 27, 128);
     pdf.setFontSize(13);
     pdf.text(s, 18, y);
     pdf.setTextColor(30);
     y += 8;
   };
-  pdf.setFillColor(19, 46, 43);
+  pdf.setFillColor(0, 27, 128);
   pdf.rect(0, 0, 210, 35, 'F');
-  pdf.setTextColor(222, 243, 178);
+  pdf.setFillColor(255, 190, 0);
+  pdf.rect(0, 35, 210, 2, 'F');
+  pdf.setTextColor(255, 255, 255);
   pdf.setFontSize(20);
   pdf.text('SL CAMPO', 18, 17);
   pdf.setFontSize(10);
