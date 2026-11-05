@@ -53,7 +53,9 @@ export function report(order: Order, user: User, kind: 'OS' | 'Relatório técni
     title('Visita técnica');
     line(
       'Técnico responsável',
-      v.technicianName || (user.role === 'tecnico' ? user.name : order.technicianId),
+      v.technicianName ||
+        order.technicianName ||
+        (user.role === 'tecnico' ? user.name : order.technicianId),
     );
     line('Chegada', date(v.checkIn));
     line('Saída', date(v.checkOut));

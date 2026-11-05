@@ -25,6 +25,7 @@ export function example() {
     priority: 'Média',
     status: 'Aguardando peças',
     technicianId: 'tec-demo',
+    technicianName: 'Lucas Ferreira (demonstração)',
     scheduled: '2026-10-27',
     createdAt: '2026-10-27T13:00:00-03:00',
     parts: catalog.map(([code, description, quantity, unitCents]) => ({

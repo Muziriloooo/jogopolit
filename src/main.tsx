@@ -318,12 +318,19 @@ function App() {
     !userModal &&
     !(selected && ['Peças', 'Atendimento'].includes(tab)) &&
     !document.activeElement?.matches('input, textarea, select, canvas, [contenteditable="true"]');
+  const manager = user?.role === 'admin';
+  const responsibleUsers =
+    user?.role === 'admin' ? [{ id: user.id, name: user.name, role: 'admin' }, ...users] : users;
+  const technicianName = (order: Order) =>
+    order.technicianName?.trim() ||
+    responsibleUsers.find((candidate) => candidate.id === order.technicianId)?.name ||
+    order.technicianId;
   const list = orders.filter(
     ({ data: o }) =>
       (filter === 'Todas' || o.status === filter) &&
       (!range.from || o.scheduled >= range.from) &&
       (!range.to || o.scheduled <= range.to) &&
-      (!range.tech || o.technicianId === range.tech) &&
+      (!range.tech || technicianName(o) === range.tech) &&
       (!range.client || o.client === range.client) &&
       (!range.unit || o.unit === range.unit) &&
       (!range.equipment || o.equipment === range.equipment) &&
@@ -335,9 +342,6 @@ function App() {
     (o.laborCents || 0) +
     (o.travelCents || 0) +
     (o.extraCents || 0);
-  const manager = user?.role === 'admin';
-  const responsibleUsers =
-    user?.role === 'admin' ? [{ id: user.id, name: user.name, role: 'admin' }, ...users] : users;
   async function deleteAttendance(id: string) {
     if (!user || user.role !== 'admin' || !online || busy || deleting) return;
     try {
@@ -667,11 +671,7 @@ function App() {
                         ['Tipo', current.data.type],
                         ['Prioridade', current.data.priority],
                         ['Agendamento', current.data.scheduled.split('-').reverse().join('/')],
-                        [
-                          'Responsável',
-                          responsibleUsers.find((u) => u.id === current.data.technicianId)?.name ||
-                            current.data.technicianId,
-                        ],
+                        ['Responsável', technicianName(current.data)],
                       ].map(([k, v]) => (
                         <div key={k}>
                           <dt>{k}</dt>
@@ -681,19 +681,15 @@ function App() {
                     </dl>
                     {manager && (
                       <label>
-                        Alterar responsável
-                        <select
-                          value={current.data.technicianId}
+                        Nome do técnico
+                        <input
+                          value={current.data.technicianName || technicianName(current.data)}
+                          maxLength={150}
+                          required
                           onChange={(e) =>
-                            update({ ...current.data, technicianId: e.target.value })
+                            update({ ...current.data, technicianName: e.target.value })
                           }
-                        >
-                          {responsibleUsers.map((u) => (
-                            <option key={u.id} value={u.id}>
-                              {u.name}
-                            </option>
-                          ))}
-                        </select>
+                        />
                       </label>
                     )}
                   </section>
@@ -722,7 +718,7 @@ function App() {
                               const v: Visit = {
                                 id: uid(),
                                 technicianId: user.id,
-                                technicianName: user.name,
+                                technicianName: current.data.technicianName || user.name,
                                 checkIn: new Date().toISOString(),
                                 hours: current.data.hours,
                                 defect: '',
@@ -1126,9 +1122,9 @@ function App() {
                             onChange={(e) => setRange({ ...range, tech: e.target.value })}
                           >
                             <option value="">Todos</option>
-                            {users.map((u) => (
-                              <option value={u.id} key={u.id}>
-                                {u.name}
+                            {[...new Set(all.map((order) => technicianName(order)))].map((name) => (
+                              <option value={name} key={name}>
+                                {name}
                               </option>
                             ))}
                           </select>
@@ -1198,16 +1194,8 @@ function App() {
                           <Badge status={o.status} />
                         </div>
                         <div className="assignee">
-                          <span className="avatar tiny">
-                            {
-                              (responsibleUsers.find((u) => u.id === o.technicianId)?.name ||
-                                'T')[0]
-                            }
-                          </span>
-                          <span>
-                            {responsibleUsers.find((u) => u.id === o.technicianId)?.name ||
-                              o.technicianId}
-                          </span>
+                          <span className="avatar tiny">{technicianName(o)[0] || 'T'}</span>
+                          <span>{technicianName(o)}</span>
                         </div>
                         <ChevronRight size={18} />
                       </button>
@@ -1655,6 +1643,7 @@ function App() {
       {modal && (
         <NewOrder
           users={responsibleUsers}
+          ownerId={user.id}
           close={() => setModal(false)}
           create={(o) => {
             if (deletedIds.current.has(o.id)) {
@@ -2572,10 +2561,12 @@ function Modal({
 }
 function NewOrder({
   users,
+  ownerId,
   close,
   create,
 }: {
   users: { id: string; name: string }[];
+  ownerId: string;
   close: () => void;
   create: (o: Order) => void;
 }) {
@@ -2587,6 +2578,12 @@ function NewOrder({
           e.preventDefault();
           const f = new FormData(e.currentTarget),
             get = (s: string) => String(f.get(s) || '');
+          const technicianName = get('technicianName').trim();
+          const matchingUser = users.find(
+            (candidate) =>
+              candidate.name.trim().toLocaleLowerCase('pt-BR') ===
+              technicianName.toLocaleLowerCase('pt-BR'),
+          );
           create({
             id: get('id'),
             client: get('client'),
@@ -2600,7 +2597,8 @@ function NewOrder({
             hours: Number(get('hours')),
             type: get('type') as any,
             priority: get('priority') as any,
-            technicianId: get('technicianId'),
+            technicianId: matchingUser?.id || ownerId,
+            technicianName,
             scheduled: get('scheduled'),
             createdAt: new Date().toISOString(),
             status: 'Pendente',
@@ -2657,24 +2655,14 @@ function NewOrder({
             </select>
           </label>
           <label>
-            Responsável pelo atendimento *
-            <select name="technicianId" required defaultValue={users[0]?.id || ''}>
-              <option value="">Selecione</option>
-              {users.map((u) => (
-                <option value={u.id} key={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </select>
+            Nome do técnico *
+            <input name="technicianName" required maxLength={150} autoComplete="name" />
           </label>
           <label>
             Agendamento *<input name="scheduled" type="date" required defaultValue={day()} />
           </label>
         </div>
-        {!users.length && (
-          <p className="form-error">Cadastre um técnico na seção Equipe técnica.</p>
-        )}
-        <button className="btn primary full" disabled={!users.length}>
+        <button className="btn primary full">
           <Plus size={17} />
           Criar ordem de serviço
         </button>

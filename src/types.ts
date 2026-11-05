@@ -66,6 +66,7 @@ export type Order = {
   priority: 'Baixa' | 'Média' | 'Alta' | 'Urgente';
   status: 'Pendente' | 'Em andamento' | 'Aguardando peças' | 'Concluída';
   technicianId: string;
+  technicianName?: string;
   scheduled: string;
   createdAt: string;
   parts: Part[];

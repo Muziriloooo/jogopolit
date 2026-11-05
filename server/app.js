@@ -497,7 +497,8 @@ export async function createApp(db) {
             for (const v of next.visits)
               if (!prev.data.visits.some((old) => old.id === v.id)) {
                 v.technicianId = user.id;
-                v.technicianName = user.name;
+                v.technicianName =
+                  user.role === 'admin' ? next.technicianName || user.name : user.name;
               }
             next = validateTransition(next, prev.data, user);
           } else {

@@ -62,6 +62,7 @@ export const orderSchema = z.object({
   priority: z.enum(['Baixa', 'Média', 'Alta', 'Urgente']),
   status: z.enum(['Pendente', 'Em andamento', 'Aguardando peças', 'Concluída']),
   technicianId: z.string(),
+  technicianName: z.string().trim().min(1).max(150).optional(),
   scheduled: z.string(),
   createdAt: z.string(),
   parts: z
@@ -99,6 +100,7 @@ export function validateTransition(next, previous, user, { initial = false } = {
   if (user.role === 'tecnico') {
     for (const key of [
       'technicianId',
+      'technicianName',
       'client',
       'unit',
       'scheduled',
@@ -232,6 +234,7 @@ export function validationMessage(error) {
     serial: 'Número de série',
     asset: 'Patrimônio',
     technicianId: 'Responsável pelo atendimento',
+    technicianName: 'Nome do técnico',
     checkIn: 'Data de chegada',
     checkOut: 'Data de saída',
     status: 'Situação',

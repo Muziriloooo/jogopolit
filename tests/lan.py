@@ -45,7 +45,7 @@ with tempfile.TemporaryDirectory() as tmp:
    assert phone.evaluate('typeof crypto.randomUUID')=='undefined'
    computer.get_by_role('button',name='Nova ordem de serviço').click()
    for label,value in [('Número da OS *',ORDER),('Cliente *','Cliente LAN'),('Unidade *','Unidade LAN'),('Equipamento *','Lavadora LAN')]:computer.get_by_label(label,exact=True).fill(value)
-   computer.locator('select[name=technicianId]').select_option('tec-demo');computer.get_by_role('button',name='Criar ordem de serviço').click()
+   computer.get_by_label('Nome do técnico *',exact=True).fill('Lucas Ferreira');computer.get_by_role('button',name='Criar ordem de serviço').click()
    expect(phone.get_by_role('button',name=ORDER)).to_be_visible(timeout=25000)
    phone.get_by_role('button',name=ORDER).click();phone.get_by_role('button',name='INICIAR ATENDIMENTO',exact=True).click();expect(phone.get_by_text('Check-in registrado',exact=True)).to_be_visible()
    phone.get_by_role('button',name='Continuar',exact=True).click();phone.get_by_label('Diagnóstico técnico *',exact=True).fill('Laudo LAN preservado')

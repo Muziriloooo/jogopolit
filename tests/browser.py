@@ -14,7 +14,7 @@ with sync_playwright() as p:
  page.screenshot(path=str(ART/'dashboard-desktop.png'),full_page=True)
  page.get_by_role('button',name='Nova ordem de serviço').click()
  for label,value in [('Número da OS *',ORDER),('Cliente *','Cliente de teste'),('Unidade *','Unidade de teste'),('Equipamento *','Lavadora de teste')]:page.get_by_label(label,exact=True).fill(value)
- page.locator('select[name=technicianId]').select_option('tec-demo')
+ page.get_by_label('Nome do técnico *',exact=True).fill('Lucas Ferreira')
  page.get_by_role('button',name='Criar ordem de serviço').click();expect(page.get_by_role('heading',name='Ordem de serviço')).to_be_visible()
  page.get_by_role('button',name='Sincronizar',exact=True).click();expect(page.get_by_text('Sincronizado',exact=True)).to_be_visible(timeout=15000)
  page.get_by_role('button',name='Administrador').click();expect(page.get_by_role('heading',name='Vamos ao trabalho?')).to_be_visible()
