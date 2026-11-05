@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently -k \"npm:server\" \"npm:client\"",
     "server": "node --watch --env-file-if-exists=.env server/index.js",
-    "client": "vite --host 0.0.0.0",
+    "client": "node tooling/start-client.js",
     "build": "tsc --noEmit && vite build && node server/precache.js",
     "start": "NODE_ENV=production node --env-file-if-exists=.env server/index.js",
     "test": "node --test --test-isolation=none tests/*.test.js",

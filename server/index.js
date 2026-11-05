@@ -2,6 +2,7 @@ import { database } from './db.js';
 import { createApp } from './app.js';
 import express from 'express';
 import path from 'node:path';
+console.log('Preparando o banco de dados do SL Campo...');
 const db = await database();
 const app = await createApp(db);
 if (process.env.NODE_ENV === 'production') {
