@@ -1,4 +1,5 @@
 import { openDB } from 'idb';
+import { orderIdentifier } from '../shared/order-identifiers.js';
 import type { RecordOrder, User } from './types';
 const db = openDB('sl-campo', 1, {
   upgrade(db) {
@@ -14,13 +15,30 @@ export async function session(user?: User) {
 export async function load(user: User): Promise<RecordOrder[]> {
   return (await (await db).getAll('orders'))
     .filter((x) => x.owner === user.id)
-    .map((x) => x.record);
+    .map((x) => normalizeRecord(x.record));
+}
+function normalizeRecord(record: RecordOrder): RecordOrder {
+  const normalize = (order: import('./types').Order) => ({
+    ...order,
+    id: orderIdentifier(order.id),
+  });
+  return {
+    ...record,
+    data: normalize(record.data),
+    baseData: record.baseData ? normalize(record.baseData) : undefined,
+    inFlight: record.inFlight
+      ? { ...record.inFlight, data: normalize(record.inFlight.data) }
+      : undefined,
+  };
 }
 export async function save(user: User, record: RecordOrder) {
-  await (await db).put('orders', { key: user.id + ':' + record.data.id, owner: user.id, record });
+  const normalized = normalizeRecord(record);
+  await (
+    await db
+  ).put('orders', { key: user.id + ':' + normalized.data.id, owner: user.id, record: normalized });
 }
 export async function removeOrder(user: User, id: string) {
-  await (await db).delete('orders', user.id + ':' + id);
+  await (await db).delete('orders', user.id + ':' + orderIdentifier(id));
 }
 export async function clearDevice() {
   const d = await db;
@@ -136,6 +154,7 @@ async function fitImage(src: string, format: 'jpeg' | 'png' = 'jpeg'): Promise<s
 }
 export async function prepareOrderForSync(order: import('./types').Order) {
   const next = structuredClone(order);
+  next.id = orderIdentifier(next.id);
   if (!Array.isArray(next.visits)) return next;
   for (const visit of next.visits) {
     if (!visit || typeof visit !== 'object') continue;

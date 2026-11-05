@@ -154,3 +154,11 @@ Uma OS criada offline pode chegar ao servidor já com visita, peças e laudo pre
 Cada OS possui o botão **Excluir atendimento**, visível somente ao administrador. A API também verifica essa permissão. A exclusão funciona inclusive para um rascunho ainda não enviado, é comunicada aos outros aparelhos e não exclui outras OS. A limpeza em lote continua disponível em Configurações.
 
 Os comandos `npm run test:browser`, `npm run test:realtime`, `npm run test:lan` e `npm run test:requests` usam banco temporário e portas 5191/5192 (o teste LAN também usa 5188), sem preencher ou limpar o banco da operação. Requerem Python, Playwright e Chromium conforme a seção de testes. `test:requests` reproduz os avisos reportados, a recuperação da conta antiga, a criação offline, a compressão de foto grande e a exclusão individual por perfil.
+
+## Correção da identificação e exclusão solicitada da OS 44918
+
+Os botões de exclusão aceitam identificações numéricas e chaves de versões antigas, incluindo espaços, pontos, barras e sublinhados. A chave armazenada é preservada exatamente; o sistema não tenta adivinhar outro chamado. A exclusão individual usa JSON para não depender da interpretação de barras ou caracteres especiais na URL. A API continua restrita ao administrador, com consultas parametrizadas, e devolve a identificação primária real do banco para a interface.
+
+Esta atualização inclui a exclusão **explicitamente solicitada da OS 44918**. Ao iniciar a API com a versão nova, uma manutenção transacional remove somente essa OS e seus snapshots, registra a exclusão e marca a ação como aplicada. Não executa uma limpeza geral e não repete a manutenção a cada inicialização. O marcador de exclusão também cancela o rascunho 44918 dos aparelhos ao sincronizar, para impedir que ele volte. Na primeira aplicação, recarregue a página uma vez, sem apagar os dados do navegador.
+
+Em instalações com `SKIP_SCHEMA=true`, aplique `server/schema.sql` e as permissões da nova tabela `applied_maintenance` antes de iniciar a API. No ambiente local padrão o esquema é aplicado automaticamente. Atualizar os arquivos no GitHub não executa a ação no computador do usuário: é necessário carregar a versão nova e reiniciar o iniciador.

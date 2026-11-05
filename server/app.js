@@ -4,7 +4,9 @@ import { rateLimit } from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
 import { randomBytes, createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
+import { orderIdentifier, deletionIdentifiers } from '../shared/order-identifiers.js';
 import { example } from './seed.js';
+import { applyRequestedMaintenance } from './maintenance.js';
 import {
   orderSchema,
   sanitize,
@@ -84,6 +86,7 @@ export async function createApp(db) {
       ]);
     }
   }
+  await applyRequestedMaintenance(db);
   // Serialize work on the shared embedded/pooled connection; transactions cannot interleave.
   let tail = Promise.resolve();
   const serial = (fn) => {
@@ -344,13 +347,15 @@ export async function createApp(db) {
   const deleteOrders = async (req, res) => {
     if (req.user.role !== 'admin')
       return res.status(403).json({ error: 'Somente o administrador pode excluir atendimentos.' });
-    const requested = req.params.id ? [req.params.id] : req.body?.ids || [];
-    if (
-      !Array.isArray(requested) ||
-      requested.length > 1000 ||
-      requested.some((id) => typeof id !== 'string' || !/^[a-zA-Z0-9-]{1,50}$/.test(id))
-    )
-      return res.status(400).json({ error: 'Identificação de atendimento inválida.' });
+    const single = req.method === 'POST' || Object.hasOwn(req.params, 'id');
+    let requested;
+    try {
+      requested = deletionIdentifiers(
+        single ? [req.params.id ?? req.body?.id] : (req.body?.ids ?? []),
+      );
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
     try {
       const removed = await serial(async () => {
         await db.exec('BEGIN');
@@ -361,10 +366,10 @@ export async function createApp(db) {
           );
           const rows = (
             await db.query(
-              req.params.id
+              single
                 ? 'SELECT id,technician_id FROM orders WHERE id=$1 FOR UPDATE'
                 : 'SELECT id,technician_id FROM orders FOR UPDATE',
-              req.params.id ? [req.params.id] : [],
+              single ? [requested[0]] : [],
             )
           ).rows;
           for (const id of requested)
@@ -407,6 +412,7 @@ export async function createApp(db) {
   };
   app.delete('/api/orders', deleteOrders);
   app.delete('/api/orders/:id', deleteOrders);
+  app.post('/api/order-deletions', deleteOrders);
   app.get('/api/orders', async (req, res) => {
     const r = await actorQuery(
       req.user,
@@ -415,7 +421,12 @@ export async function createApp(db) {
         : 'SELECT * FROM orders',
       req.user.role === 'tecnico' ? [req.user.id] : [],
     );
-    res.json(r.rows.map((r) => ({ data: sanitize(r.data, req.user.role), revision: r.revision })));
+    res.json(
+      r.rows.map((r) => ({
+        data: { ...sanitize(r.data, req.user.role), id: r.id },
+        revision: r.revision,
+      })),
+    );
   });
   app.get('/api/orders/:id/audit', async (req, res) => {
     const r = await actorQuery(req.user, 'SELECT technician_id FROM orders WHERE id=$1', [
@@ -439,7 +450,7 @@ export async function createApp(db) {
       const { commandId, baseRevision, data } = req.body;
       if (!/^[0-9a-f-]{36}$/.test(commandId) || !Number.isInteger(baseRevision) || baseRevision < 0)
         return res.status(400).json({ error: 'Comando inválido.' });
-      let next = orderSchema.parse(data);
+      let next = orderSchema.parse({ ...data, id: orderIdentifier(data?.id) });
       const user = req.user;
       let audience;
       const result = await serial(async () => {

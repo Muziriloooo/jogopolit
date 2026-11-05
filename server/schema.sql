@@ -32,3 +32,4 @@ ALTER TABLE users ADD CONSTRAINT users_role_check CHECK(role IN ('tecnico','admi
 CREATE UNIQUE INDEX IF NOT EXISTS one_active_administrator ON users(role) WHERE role='admin' AND disabled_at IS NULL;
 DROP POLICY IF EXISTS order_access ON orders;
 CREATE POLICY order_access ON orders USING (current_setting('app.role',true)='admin' OR technician_id=current_setting('app.user_id',true)) WITH CHECK (current_setting('app.role',true)='admin' OR technician_id=current_setting('app.user_id',true));
+CREATE TABLE IF NOT EXISTS applied_maintenance(id text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now());

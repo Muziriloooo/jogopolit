@@ -12,7 +12,7 @@ export async function localVersion(root) {
       else if (entry.isFile()) files.push(name);
     }
   }
-  await Promise.all(['src', 'server', 'public', 'tooling'].map(walk));
+  await Promise.all(['src', 'server', 'public', 'tooling', 'shared'].map(walk));
   const hash = createHash('sha256');
   for (const file of files.sort()) hash.update(file).update(await readFile(path.join(root, file)));
   return hash.digest('hex').slice(0, 20);

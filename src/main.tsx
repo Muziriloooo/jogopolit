@@ -41,6 +41,7 @@ import { watchLocalUpdates } from './local-updates';
 import { createId } from './ids';
 import { migrateAccounts, recoveredDrafts, prepareOrderForSync } from './store';
 import { exchangeOrders } from './sync-engine';
+import { orderIdentifier } from '../shared/order-identifiers.js';
 import './styles.css';
 const uid = createId;
 const day = () => new Date().toLocaleDateString('en-CA');
@@ -161,7 +162,7 @@ function App() {
           return ids;
         },
         remove: async (id) => {
-          replace(ordersRef.current.filter((r) => r.data.id !== id));
+          replace(ordersRef.current.filter((r) => orderIdentifier(r.data.id) !== id));
           setSelected((current) => (current === id ? undefined : current));
           localWrites.current = localWrites.current.then(() => removeOrder(user, id));
           await localWrites.current;
@@ -339,14 +340,20 @@ function App() {
     user?.role === 'admin' ? [{ id: user.id, name: user.name, role: 'admin' }, ...users] : users;
   async function deleteAttendance(id: string) {
     if (!user || user.role !== 'admin' || !online || busy || deleting) return;
+    try {
+      id = orderIdentifier(id);
+    } catch (error: any) {
+      flash(error.message);
+      return;
+    }
     if (!confirm(`Excluir o atendimento #${id}, incluindo visitas, fotos, assinatura e peças?`))
       return;
     setDeleting(true);
     try {
       await localWrites.current;
-      await api('/orders/' + encodeURIComponent(id), { method: 'DELETE' });
+      await api('/order-deletions', { method: 'POST', body: JSON.stringify({ id }) });
       deletedIds.current.add(id);
-      replace(ordersRef.current.filter((r) => r.data.id !== id));
+      replace(ordersRef.current.filter((r) => orderIdentifier(r.data.id) !== id));
       localWrites.current = localWrites.current.then(() => removeOrder(user, id));
       await localWrites.current;
       setSelected((current) => (current === id ? undefined : current));
@@ -1541,7 +1548,9 @@ function App() {
                               );
                             }
                             replace(
-                              ordersRef.current.filter((r) => !result.ids.includes(r.data.id)),
+                              ordersRef.current.filter(
+                                (r) => !result.ids.includes(orderIdentifier(r.data.id)),
+                              ),
                             );
                             setSelected(undefined);
                             await localWrites.current;

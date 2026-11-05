@@ -7,7 +7,7 @@ import { localVersion } from '../tooling/local-version.js';
 test('versão local detecta mudanças de código sem ler .env e banco', async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'sl-version-'));
   try {
-    for (const name of ['src', 'server', 'public', 'tooling', '.data'])
+    for (const name of ['src', 'server', 'public', 'tooling', 'shared', '.data'])
       await mkdir(path.join(dir, name));
     for (const file of [
       'index.html',

@@ -75,7 +75,7 @@ test('administrador zera chamados e técnicos, preserva acessos e impede restaur
     assert.equal(removed.status, 200);
     assert.equal(removed.data.deleted, 1);
     assert.deepEqual((await f.req('/orders', 'GET', undefined, admin)).data, []);
-    assert.deepEqual((await f.req('/order-deletions', 'GET', undefined, tech)).data, ['41250']);
+    assert.ok((await f.req('/order-deletions', 'GET', undefined, tech)).data.includes('41250'));
     assert.equal((await f.req('/sync', 'POST', command, tech)).status, 410);
     assert.equal((await f.db.query('SELECT count(*)::int AS n FROM commands')).rows[0].n, 0);
     assert.equal((await f.req('/technicians', 'DELETE', undefined, admin)).data.deleted, 1);
@@ -136,6 +136,89 @@ test('OS preenchida antes do primeiro envio sincroniza e exclusão individual n�
         )
       ).status,
       400,
+    );
+  } finally {
+    await f.close();
+  }
+});
+test('exclusão individual e em lote aceitam chaves legadas e não dependem do JSON interno', async () => {
+  const f = await setup(true);
+  try {
+    const admin = await f.login('admin@slcampo.local'),
+      tech = await f.login('tecnico@slcampo.local');
+    const source = (await f.req('/orders', 'GET', undefined, admin)).data[0].data;
+    const id = 'OS 5544/2026_legacy.svg';
+    await f.db.query('INSERT INTO orders(id,technician_id,data) VALUES($1,$2,$3)', [
+      id,
+      'tec-demo',
+      JSON.stringify({ ...source, id: 5544 }),
+    ]);
+    const rows = (await f.req('/orders', 'GET', undefined, admin)).data;
+    assert.ok(rows.some((r) => r.data.id === id));
+    assert.equal((await f.req('/order-deletions', 'POST', { id }, tech)).status, 403);
+    const one = await f.req('/order-deletions', 'POST', { id }, admin);
+    assert.equal(one.status, 200);
+    assert.deepEqual(one.data.ids, [id]);
+    assert.ok(
+      (await f.req('/orders', 'GET', undefined, admin)).data.some((r) => r.data.id === '41250'),
+    );
+    const numeric = await f.req('/order-deletions', 'POST', { id: 5544 }, admin);
+    assert.equal(numeric.status, 200);
+    assert.deepEqual(numeric.data.ids, ['5544']);
+    const malformed = await f.req('/orders', 'DELETE', { ids: [{}] }, admin);
+    assert.equal(malformed.status, 400);
+    assert.equal((await f.req('/orders', 'GET', undefined, admin)).data.length, 1);
+    const all = await f.req('/orders', 'DELETE', { ids: [777, 'Rascunho 99/2026'] }, admin);
+    assert.equal(all.status, 200);
+    assert.ok(all.data.ids.includes('777'));
+    assert.ok(all.data.ids.includes('Rascunho 99/2026'));
+    assert.deepEqual((await f.req('/orders', 'GET', undefined, admin)).data, []);
+  } finally {
+    await f.close();
+  }
+});
+test('limpeza solicitada exclui somente 44918 e é executada uma única vez', async () => {
+  const { applyRequestedMaintenance } = await import('../server/maintenance.js');
+  const f = await setup(true);
+  try {
+    // Reproduce an installation that has not received this requested cleanup yet.
+    await f.db.query('DELETE FROM applied_maintenance WHERE id=$1', [
+      'requested-delete-order-44918-v1',
+    ]);
+    await f.db.query('DELETE FROM order_deletions WHERE id=$1', ['44918']);
+    const data = (await f.db.query("SELECT data FROM orders WHERE id='41250'")).rows[0].data;
+    await f.db.query('INSERT INTO orders(id,technician_id,data) VALUES($1,$2,$3)', [
+      '44918',
+      'tec-demo',
+      JSON.stringify({ ...data, id: '44918' }),
+    ]);
+    await f.db.query('INSERT INTO commands VALUES($1,$2,$3,$4)', [
+      crypto.randomUUID(),
+      'adm-demo',
+      '44918',
+      JSON.stringify({ data }),
+    ]);
+    await applyRequestedMaintenance(f.db);
+    assert.deepEqual(
+      (await f.db.query('SELECT id FROM orders ORDER BY id')).rows.map((r) => r.id),
+      ['41250'],
+    );
+    assert.equal(
+      (await f.db.query("SELECT count(*)::int AS n FROM commands WHERE order_id='44918'")).rows[0]
+        .n,
+      0,
+    );
+    assert.equal(
+      (await f.db.query("SELECT count(*)::int AS n FROM order_deletions WHERE id='44918'")).rows[0]
+        .n,
+      1,
+    );
+    const audit = (await f.db.query("SELECT count(*)::int AS n FROM audit WHERE order_id='44918'"))
+      .rows[0].n;
+    await applyRequestedMaintenance(f.db);
+    assert.equal(
+      (await f.db.query("SELECT count(*)::int AS n FROM audit WHERE order_id='44918'")).rows[0].n,
+      audit,
     );
   } finally {
     await f.close();

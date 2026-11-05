@@ -8,7 +8,7 @@ LAN=os.environ.get('SL_LAN_HOST','192.0.2.10')
 ORDER='E2E-LAN-'+uuid.uuid4().hex[:8]
 with tempfile.TemporaryDirectory() as tmp:
  folder=Path(tmp)
- for name in ['src','server','public','tooling']:
+ for name in ['src','server','public','tooling','shared']:
   shutil.copytree(ROOT/name,folder/name)
  for name in ['package.json','package-lock.json','vite.config.ts','index.html','tsconfig.json']:
   shutil.copy(ROOT/name,folder/name)

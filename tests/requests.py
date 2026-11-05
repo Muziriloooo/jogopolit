@@ -31,13 +31,25 @@ with sync_playwright() as p:
  context.set_offline(False);expect(page.get_by_text('Sincronizado',exact=True)).to_be_visible(timeout=15000)
  record=next(r for r in context.request.get(URL+'/api/orders').json() if r['data']['id']==mobile_id);assert len(record['data']['visits'])==1
  # Adaptive image compression for existing drafts beyond the old schema limit.
- result=page.evaluate('''async()=>{const c=document.createElement('canvas');c.width=1600;c.height=1600;const ctx=c.getContext('2d');const pixels=ctx.createImageData(1600,1600);for(let i=0;i<pixels.data.length;i+=4){pixels.data[i]=Math.random()*256;pixels.data[i+1]=Math.random()*256;pixels.data[i+2]=Math.random()*256;pixels.data[i+3]=255}ctx.putImageData(pixels,0,0);const raw=c.toDataURL('image/jpeg',1);const {prepareOrderForSync}=await import('/src/store.ts');const next=await prepareOrderForSync({visits:[{photos:[{data:raw}],signature:null}]});return {before:raw.length,after:next.visits[0].photos[0].data.length}}''')
+ result=page.evaluate('''async()=>{const c=document.createElement('canvas');c.width=1600;c.height=1600;const ctx=c.getContext('2d');const pixels=ctx.createImageData(1600,1600);for(let i=0;i<pixels.data.length;i+=4){pixels.data[i]=Math.random()*256;pixels.data[i+1]=Math.random()*256;pixels.data[i+2]=Math.random()*256;pixels.data[i+3]=255}ctx.putImageData(pixels,0,0);const raw=c.toDataURL('image/jpeg',1);const {prepareOrderForSync}=await import('/src/store.ts');const next=await prepareOrderForSync({id:'PHOTO-PROBE',visits:[{photos:[{data:raw}],signature:null}]});return {before:raw.length,after:next.visits[0].photos[0].data.length}}''')
  assert result['before']>1600000 and result['after']<=1400000,result
  # Only administrator may delete: technician has neither UI button nor API permission.
  tech=browser.new_context();tp=tech.new_page();tp.goto(URL);tp.get_by_label('E-mail corporativo').fill('tecnico@slcampo.local');tp.get_by_label('Senha',exact=True).fill('Campo-demo-2026!');tp.get_by_role('button',name='Entrar no SL Campo').click();expect(tp.get_by_role('button',name=ORDER)).to_be_visible(timeout=15000);tp.get_by_role('button',name=ORDER).click();assert tp.get_by_role('button',name='Excluir atendimento',exact=True).count()==0;assert tech.request.delete(URL+'/api/orders/'+ORDER).status==403
  page.get_by_role('button',name='Voltar para as ordens').click();page.get_by_role('button',name=ORDER).click();page.on('dialog',lambda d:d.accept());page.get_by_role('button',name='Excluir atendimento',exact=True).click();expect(page.get_by_text('Atendimento #'+ORDER+' excluído.',exact=True)).to_be_visible(timeout=10000)
  expect(tp.locator('.detail-tabs')).to_have_count(0,timeout=10000)
  rows=context.request.get(URL+'/api/orders').json();assert all(r['data']['id']!=ORDER for r in rows);assert any(r['data']['id']==mobile_id for r in rows)
+ # Both deletion buttons must also cancel old drafts with numeric or formatted IDs.
+ legacy=[]
+ for legacy_id in [44918,5544,'OS _777/2026.svg']:
+  item=json.loads(json.dumps(draft));item['id']=legacy_id;item['visits']=[];item['status']='Pendente';item['unit']='Rascunho legado'
+  legacy.append({'data':item,'revision':0,'pending':True,'commandId':str(uuid.uuid4()),'error':'Rascunho legado para exclusão'})
+ page.evaluate('''async records=>{const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('sl-campo',1);r.onsuccess=()=>resolve(r.result);r.onerror=reject});const tx=db.transaction('orders','readwrite');for(const record of records)tx.objectStore('orders').put({key:'adm-demo:'+record.data.id,owner:'adm-demo',record});await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=reject});db.close()}''',legacy)
+ page.reload();expect(page.get_by_role('heading',name='Olá, Administrador.')).to_be_visible()
+ page.wait_for_function('''async()=>{const db=await new Promise(resolve=>{const r=indexedDB.open('sl-campo',1);r.onsuccess=()=>resolve(r.result)});const row=await new Promise(resolve=>{const r=db.transaction('orders').objectStore('orders').get('adm-demo:44918');r.onsuccess=()=>resolve(r.result)});db.close();return !row}''',timeout=15000)
+ page.get_by_role('button',name='#5544',exact=False).click();page.get_by_role('button',name='Excluir atendimento',exact=True).click();expect(page.get_by_text('Atendimento #5544 excluído.',exact=True)).to_be_visible(timeout=10000)
+ page.get_by_role('button',name='Ajustes',exact=True).click();page.get_by_role('button',name='Excluir todos os chamados',exact=True).click();expect(page.get_by_text('chamados excluídos.',exact=False)).to_be_visible(timeout=10000)
+ assert context.request.get(URL+'/api/orders').json()==[]
+ page.reload();expect(page.get_by_role('heading',name='Olá, Administrador.')).to_be_visible();expect(page.get_by_text('Nenhuma ordem por aqui',exact=True)).to_be_visible()
  assert not errors,errors
- print('PASS solicitações: rascunho antigo recuperado, OS nova iniciada offline sincronizada, campos removidos, foto grande comprimida, exclusão individual restrita ao administrador e propagada sem apagar outras OS.')
+ print('PASS solicitações: rascunho antigo recuperado, OS nova iniciada offline sincronizada, campos removidos, foto grande comprimida, exclusão individual e em lote com IDs antigos; OS 44918 removida automaticamente; permissões e outras OS preservadas na exclusão individual.')
  browser.close()
