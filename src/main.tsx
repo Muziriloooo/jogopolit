@@ -837,7 +837,7 @@ function App() {
                   <div className="section-heading">
                     <div>
                       <h2>Registro fotográfico</h2>
-                      <p>Antes, depois e evidências vinculadas a cada visita.</p>
+                      <p>Fotos vinculadas a cada visita do atendimento.</p>
                     </div>
                     <Camera size={24} />
                   </div>
@@ -852,9 +852,8 @@ function App() {
                     {current.data.visits.flatMap((v, i) =>
                       v.photos.map((p) => (
                         <figure key={p.id}>
-                          <img src={p.data} alt={p.caption || p.category} />
+                          <img src={p.data} alt={p.caption || 'Foto do atendimento'} />
                           <figcaption>
-                            <Badge status={p.category} />
                             <p>{p.caption || 'Sem legenda'}</p>
                             <small>
                               Visita {i + 1} · {date(v.checkIn)}
@@ -1801,7 +1800,6 @@ function VisitForm({
 }) {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [category, setCategory] = useState<'Antes' | 'Depois' | 'Peça danificada'>('Antes');
   const set = (patch: Partial<Visit>) =>
     change({
       ...order,
@@ -1853,7 +1851,7 @@ function VisitForm({
     try {
       const next = [];
       for (const f of Array.from(files))
-        next.push({ id: uid(), category, caption: '', data: await compress(f) });
+        next.push({ id: uid(), caption: '', data: await compress(f) });
       set({ photos: [...visit.photos, ...next] });
     } catch (e: any) {
       flash(e.message);
@@ -2056,17 +2054,9 @@ function VisitForm({
         )}
         {step === 2 && (
           <>
-            <label>
-              Categoria das fotos
-              <select value={category} onChange={(e) => setCategory(e.target.value as any)}>
-                <option>Antes</option>
-                <option>Depois</option>
-                <option>Peça danificada</option>
-              </select>
-            </label>
             <div className="upload-area">
               <Camera size={34} />
-              <h3>Adicione as evidências da visita</h3>
+              <h3>Adicione fotos do atendimento</h3>
               <p>Até 16 fotos, com compressão automática.</p>
               <div className="upload-buttons">
                 <label className="btn primary">
@@ -2103,10 +2093,10 @@ function VisitForm({
             <div className="photo-grid">
               {visit.photos.map((p) => (
                 <figure key={p.id}>
-                  <img src={p.data} alt={p.caption || p.category} />
+                  <img src={p.data} alt={p.caption || 'Foto do atendimento'} />
                   <figcaption>
                     <div className="section-heading">
-                      <Badge status={p.category} />
+                      <span>Foto do atendimento</span>
                       <button
                         className="icon-btn danger"
                         aria-label="Excluir foto"
@@ -2117,7 +2107,7 @@ function VisitForm({
                     </div>
                     <input
                       aria-label="Legenda da foto"
-                      placeholder="Descreva esta evidência…"
+                      placeholder="Legenda opcional…"
                       value={p.caption}
                       onChange={(e) =>
                         set({

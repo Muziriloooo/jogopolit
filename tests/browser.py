@@ -28,6 +28,7 @@ with sync_playwright() as p:
  for label,value in [('Qual o defeito relatado? *','Ruído no conjunto do rodo'),('Diagnóstico técnico *','Desgaste identificado na inspeção'),('Quais serviços foram executados? *','Limpeza e ajuste do conjunto')]:page.get_by_label(label,exact=True).fill(value)
  page.get_by_role('button',name='Continuar',exact=True).click()
  # Test actual image processing, IndexedDB persistence, captions.
+ expect(page.get_by_text('Categoria das fotos',exact=True)).to_have_count(0)
  from PIL import Image
  Image.new('RGB',(1000,700),'#52744b').save(ART/'foto.jpg')
  page.locator('input[type=file][multiple]').set_input_files(str(ART/'foto.jpg'))

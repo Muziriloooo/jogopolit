@@ -80,15 +80,16 @@ export function report(order: Order, user: User, kind: 'OS' | 'Relatório técni
     );
     if (!installed.length) line('Instalações', 'Nenhuma');
     installed.forEach((p) => line(p.code, `${p.quantity} × ${p.description}`));
-    for (const p of v.photos) {
+    if (v.photos.length) title('Fotografias do atendimento');
+    for (const [index, p] of v.photos.entries()) {
       if (y > 180) page();
-      title(p.category);
+      line('Fotografia', index + 1);
       try {
         const props = pdf.getImageProperties(p.data);
         const h = Math.min(90, (150 * props.height) / props.width);
         pdf.addImage(p.data, 'JPEG', 18, y, Math.min(150, (h * props.width) / props.height), h);
         y += h + 5;
-        line('Legenda', p.caption);
+        if (p.caption.trim()) line('Legenda', p.caption);
       } catch {
         line('Foto', 'Não foi possível incorporar a imagem.');
       }

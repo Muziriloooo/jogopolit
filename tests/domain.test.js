@@ -61,9 +61,7 @@ test('validação rejeita imagem externa e quantidade negativa', () => {
   o.parts[0].quantity = -1;
   assert.equal(orderSchema.safeParse(o).success, false);
   o.parts[0].quantity = 1;
-  o.visits[0].photos = [
-    { id: 'x', category: 'Antes', caption: '', data: 'https://example.com/foto.jpg' },
-  ];
+  o.visits[0].photos = [{ id: 'x', caption: '', data: 'https://example.com/foto.jpg' }];
   assert.equal(orderSchema.safeParse(o).success, false);
 });
 test('campos elétricos antigos são opcionais e validação informa o campo incorreto', async () => {

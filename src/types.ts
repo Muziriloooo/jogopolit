@@ -19,7 +19,6 @@ export type Part = {
 };
 export type Photo = {
   id: string;
-  category: 'Antes' | 'Depois' | 'Peça danificada';
   caption: string;
   data: string;
 };

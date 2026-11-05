@@ -26,7 +26,6 @@ const visit = z.object({
     .array(
       z.object({
         id: z.string(),
-        category: z.enum(['Antes', 'Depois', 'Peça danificada']),
         caption: z.string().max(500),
         data: image,
       }),
@@ -240,7 +239,6 @@ export function validationMessage(error) {
     status: 'Situação',
     priority: 'Prioridade',
     signatureMode: 'Registro de assinatura',
-    category: 'Categoria da foto',
     description: 'Descrição da peça',
     code: 'Código da peça',
     scheduled: 'Agendamento',
