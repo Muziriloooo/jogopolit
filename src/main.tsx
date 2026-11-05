@@ -22,6 +22,7 @@ import {
   ImagePlus,
   Trash2,
   FileDown,
+  FileUp,
   LogOut,
   Menu,
   X,
@@ -42,9 +43,9 @@ import { createId } from './ids';
 import { migrateAccounts, recoveredDrafts, prepareOrderForSync } from './store';
 import { exchangeOrders } from './sync-engine';
 import { orderIdentifier } from '../shared/order-identifiers.js';
+import { importInternalPdf } from './internal-pdf';
 import './styles.css';
 const uid = createId;
-const day = () => new Date().toLocaleDateString('en-CA');
 const statuses = ['Todas', 'Pendente', 'Em andamento', 'Aguardando peças', 'Concluída'];
 function Badge({ status }: { status: string }) {
   return (
@@ -675,6 +676,7 @@ function App() {
                         ['Prioridade', current.data.priority],
                         ['Agendamento', current.data.scheduled.split('-').reverse().join('/')],
                         ['Responsável', technicianName(current.data)],
+                        ['Problema informado', current.data.reportedDefect],
                       ].map(([k, v]) => (
                         <div key={k}>
                           <dt>{k}</dt>
@@ -682,6 +684,11 @@ function App() {
                         </div>
                       ))}
                     </dl>
+                    {current.data.internalNotes && (
+                      <p className="info-note">
+                        <b>Orientações do chamado interno:</b> {current.data.internalNotes}
+                      </p>
+                    )}
                     {manager && (
                       <label>
                         Nome do técnico
@@ -724,14 +731,14 @@ function App() {
                                 technicianName: current.data.technicianName?.trim() || 'A definir',
                                 checkIn: new Date().toISOString(),
                                 hours: current.data.hours,
-                                defect: '',
+                                defect: current.data.reportedDefect || '',
                                 diagnosis: '',
                                 services: '',
                                 operational: true,
                                 misuse: false,
                                 misuseNotes: '',
                                 returnNeeded: false,
-                                notes: '',
+                                notes: current.data.internalNotes || '',
                                 mechanical: '',
                                 photos: [],
                                 signature: null,
@@ -887,6 +894,22 @@ function App() {
                     permissões do seu perfil.
                   </p>
                   <div className="document-grid">
+                    {current.data.sourcePdf && (
+                      <div className="document-card">
+                        <span className="feature-icon">
+                          <FileUp />
+                        </span>
+                        <h3>Chamado interno original</h3>
+                        <p>{current.data.sourcePdf.name}</p>
+                        <button
+                          className="btn primary"
+                          onClick={() => openPdfAttachment(current.data.sourcePdf!)}
+                        >
+                          <FileDown size={16} />
+                          Abrir PDF interno
+                        </button>
+                      </div>
+                    )}
                     {(['OS', 'Relatório técnico'] as const).map((kind) => (
                       <div className="document-card" key={kind}>
                         <span className="feature-icon">
@@ -953,8 +976,8 @@ function App() {
                   <div className="heading-actions">
                     {manager ? (
                       <button className="btn primary" onClick={() => setModal(true)}>
-                        <Plus size={18} />
-                        Nova ordem de serviço
+                        <FileUp size={18} />
+                        Importar chamado
                       </button>
                     ) : (
                       <button
@@ -1206,7 +1229,7 @@ function App() {
                       <div className="empty">
                         <ClipboardList size={36} />
                         <h3>Nenhuma ordem por aqui</h3>
-                        <p>Altere os filtros ou cadastre uma nova ordem de serviço.</p>
+                        <p>Altere os filtros ou importe o PDF de um chamado interno.</p>
                       </div>
                     )}
                   </div>
@@ -1644,7 +1667,7 @@ function App() {
       </div>
       {modal && (
         <NewOrder
-          users={responsibleUsers}
+          users={users}
           ownerId={user.id}
           close={() => setModal(false)}
           create={(o) => {
@@ -1680,6 +1703,20 @@ function download(blob: Blob, name: string) {
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function openPdfAttachment(pdf: NonNullable<Order['sourcePdf']>) {
+  const encoded = pdf.data.split(',')[1];
+  const binary = atob(encoded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.target = '_blank';
+  link.rel = 'noopener';
+  link.download = pdf.name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 function Login({ onLogin, notice }: { onLogin: (u: User, d: boolean) => void; notice: string }) {
   const [email, setEmail] = useState('');
@@ -1833,7 +1870,13 @@ function VisitForm({
           <button
             key={String(b)}
             className={visit[key] === b ? 'selected' : ''}
-            onClick={() => set({ [key]: b })}
+            onClick={() =>
+              set(
+                key === 'misuse' && !b
+                  ? { misuse: false, misuseNotes: '' }
+                  : ({ [key]: b } as Partial<Visit>),
+              )
+            }
           >
             {b ? <Check size={15} /> : <X size={15} />} {b ? 'Sim' : 'Não'}
           </button>
@@ -1860,8 +1903,8 @@ function VisitForm({
     }
   }
   function finish() {
-    if (!visit.defect.trim() || !visit.diagnosis.trim() || !visit.services.trim()) {
-      flash('Preencha defeito, diagnóstico e serviços executados.');
+    if (!visit.diagnosis.trim() || !visit.services.trim()) {
+      flash('Preencha diagnóstico e serviços executados.');
       setStep(1);
       return;
     }
@@ -2038,13 +2081,51 @@ function VisitForm({
         )}
         {step === 1 && (
           <>
-            {text('defect', 'Qual o defeito relatado? *', true)}
             {text('diagnosis', 'Diagnóstico técnico *', true)}
             {yesno('operational', 'O equipamento ficou funcionando?')}
             {yesno('misuse', 'Existe evidência de mau uso?')}
-            {text('misuseNotes', 'Evidências / descrição do mau uso', true)}
+            {visit.misuse && (
+              <div className="conditional-field">
+                {text('misuseNotes', 'Evidências / descrição do mau uso', true)}
+                <div className="upload-buttons">
+                  <label className="btn primary">
+                    <Camera size={18} />
+                    Tirar foto do mau uso
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      capture="environment"
+                      disabled={loading}
+                      onChange={(event) => {
+                        void photos(event.target.files);
+                        event.target.value = '';
+                      }}
+                    />
+                  </label>
+                  <label className="btn">
+                    <ImagePlus size={18} />
+                    Escolher fotos
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/jpeg,image/png,image/webp"
+                      disabled={loading}
+                      onChange={(event) => {
+                        void photos(event.target.files);
+                        event.target.value = '';
+                      }}
+                    />
+                  </label>
+                </div>
+                {visit.photos.length > 0 && (
+                  <p className="muted">
+                    {visit.photos.length} foto{visit.photos.length === 1 ? '' : 's'} adicionada
+                    {visit.photos.length === 1 ? '' : 's'} ao atendimento.
+                  </p>
+                )}
+              </div>
+            )}
             {text('services', 'Quais serviços foram executados? *', true)}
-            {text('mechanical', 'Verificações mecânicas e resultados', true)}
             {yesno('returnNeeded', 'Necessita retorno?')}
             {text('notes', 'Recomendações / observações', true)}
             <p className="info-note">
@@ -2639,103 +2720,95 @@ function NewOrder({
   close: () => void;
   create: (o: Order) => void;
 }) {
+  const [parsed, setParsed] = useState<Order>();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  async function choose(file?: File) {
+    if (!file) return;
+    setLoading(true);
+    setError('');
+    try {
+      const imported = await importInternalPdf(file);
+      const technician = users[0];
+      setParsed({
+        id: imported.fields.id,
+        client: imported.fields.client,
+        unit: imported.fields.unit,
+        address: imported.fields.address,
+        equipment: imported.fields.equipment,
+        brand: imported.fields.brand,
+        model: imported.fields.model,
+        serial: imported.fields.serial,
+        asset: '',
+        hours: 0,
+        type: 'Corretiva',
+        priority: 'Média',
+        technicianId: technician?.id || ownerId,
+        technicianName: technician?.name || '',
+        reportedDefect: imported.fields.reportedDefect,
+        internalNotes: imported.fields.internalNotes,
+        sourcePdf: imported.sourcePdf,
+        scheduled: imported.fields.scheduled,
+        createdAt: imported.fields.createdAt,
+        status: 'Pendente',
+        supplierOrder: '',
+        parts: [],
+        visits: [],
+        laborCents: 0,
+        travelCents: 0,
+        extraCents: 0,
+        referenceNote: 'Dados importados do PDF do chamado interno.',
+      });
+    } catch (reason: any) {
+      setParsed(undefined);
+      setError(reason.message || 'Não foi possível ler o PDF.');
+    } finally {
+      setLoading(false);
+    }
+  }
   return (
-    <Modal title="Nova ordem de serviço" close={close}>
-      <p className="muted">Cadastre o atendimento e atribua um técnico.</p>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const f = new FormData(e.currentTarget),
-            get = (s: string) => String(f.get(s) || '');
-          const technicianName = get('technicianName').trim();
-          const matchingUser = users.find(
-            (candidate) =>
-              candidate.name.trim().toLocaleLowerCase('pt-BR') ===
-              technicianName.toLocaleLowerCase('pt-BR'),
-          );
-          create({
-            id: get('id').trim(),
-            client: get('client'),
-            unit: get('unit'),
-            address: get('address'),
-            equipment: get('equipment'),
-            brand: get('brand'),
-            model: get('model'),
-            serial: get('serial'),
-            asset: get('asset'),
-            hours: Number(get('hours')),
-            type: get('type') as any,
-            priority: get('priority') as any,
-            technicianId: matchingUser?.id || ownerId,
-            technicianName,
-            scheduled: get('scheduled'),
-            createdAt: new Date().toISOString(),
-            status: 'Pendente',
-            supplierOrder: '',
-            parts: [],
-            visits: [],
-            laborCents: 0,
-            travelCents: 0,
-            extraCents: 0,
-            referenceNote: '',
-          });
-        }}
-      >
-        <div className="form-grid">
-          {[
-            ['id', 'Número da OS *'],
-            ['client', 'Cliente *'],
-            ['unit', 'Unidade *'],
-            ['equipment', 'Equipamento *'],
-            ['address', 'Endereço'],
-            ['brand', 'Marca'],
-            ['model', 'Modelo'],
-            ['serial', 'Série'],
-            ['asset', 'Patrimônio'],
-          ].map(([k, l], i) => (
-            <label key={k}>
-              {l}
-              <input name={k} required={i < 4} maxLength={k === 'id' ? 512 : 150} />
-            </label>
-          ))}
-          <label>
-            Horímetro
-            <input name="hours" type="number" min="0" step="0.1" defaultValue="0" required />
-          </label>
-          <label>
-            Tipo
-            <select name="type">
-              <option>Preventiva</option>
-              <option>Corretiva</option>
-            </select>
-          </label>
-          <label>
-            Prioridade
-            <select name="priority">
-              <option>Média</option>
-              <option>Baixa</option>
-              <option>Alta</option>
-              <option>Urgente</option>
-            </select>
-          </label>
-          <label>
-            Nome do técnico (opcional)
-            <input
-              name="technicianName"
-              maxLength={150}
-              autoComplete="name"
-              placeholder="A definir"
-            />
-          </label>
-          <label>
-            Agendamento *<input name="scheduled" type="date" required defaultValue={day()} />
-          </label>
+    <Modal title="Importar chamado interno" close={close}>
+      <p className="muted">
+        Selecione o PDF do chamado. Número, cliente, equipamento, problema e endereço serão
+        preenchidos automaticamente.
+      </p>
+      <label className="upload-area pdf-import">
+        <FileUp size={34} />
+        <h3>{loading ? 'Lendo o chamado…' : 'Selecionar PDF do chamado interno'}</h3>
+        <p>Arquivo PDF de até 12 MB.</p>
+        <input
+          aria-label="PDF do chamado interno"
+          type="file"
+          accept="application/pdf,.pdf"
+          disabled={loading}
+          onChange={(event) => void choose(event.target.files?.[0])}
+        />
+      </label>
+      {error && <p className="form-error">{error}</p>}
+      {parsed && (
+        <div className="import-preview">
+          <h3>Chamado #{parsed.id}</h3>
+          <p>
+            <b>{parsed.client}</b> · {parsed.unit}
+          </p>
+          <p>
+            {parsed.equipment} · {parsed.brand} {parsed.model}
+          </p>
+          <p>{parsed.reportedDefect || 'Problema descrito no PDF anexado.'}</p>
+          <p className="muted">
+            Responsável: {parsed.technicianName || 'A definir'} · O PDF ficará disponível para o
+            técnico.
+          </p>
         </div>
-        <button className="btn primary full">
-          <Plus size={17} />
-          Criar ordem de serviço
-        </button>
-      </form>
+      )}
+      <button
+        className="btn primary full"
+        disabled={!parsed || loading}
+        onClick={() => create(parsed!)}
+      >
+        <FileUp size={17} />
+        Criar atendimento pelo PDF
+      </button>
     </Modal>
   );
 }

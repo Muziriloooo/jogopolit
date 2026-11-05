@@ -15,11 +15,12 @@ npm run dev
 
 Vite: porta 5173, API: porta 3001. O motor PostgreSQL embarcado inicializa em `.data/postgres`. Não apague `.data` para atualizar dependências. As tabelas são criadas automaticamente de modo idempotente.
 
-Na primeira inicialização demonstrativa é criado somente um login administrativo com a senha configurada em `DEMO_PASSWORD`:
+Na primeira inicialização demonstrativa são criados estes acessos com a senha configurada em `DEMO_PASSWORD`:
 
 - `admin@slcampo.local`: administrador.
+- `tecnico.teste@slcampo.local`: técnico de teste.
 
-O sistema inicia **sem chamados e sem técnicos**. Entre como administrador e cadastre os técnicos em Equipe técnica → Adicionar usuário. O login administrativo demonstrativo é fictício. Contas não são recriadas se o banco já tiver usuários. Mudar `DEMO_PASSWORD` após o primeiro boot não altera senhas existentes.
+O sistema inicia **sem chamados**, com somente o técnico fictício acima para homologação. Se ele for excluído pelo administrador, não será recriado nos próximos reinícios. Mudar `DEMO_PASSWORD` após o primeiro boot não altera senhas existentes.
 
 ## Iniciar no Windows
 
@@ -27,7 +28,7 @@ No Windows 10 ou 11, dê dois cliques em `iniciar.bat` na pasta completa do proj
 
 O arquivo verifica o Node.js 24 e o npm. Se não estiverem disponíveis, baixa automaticamente o pacote portátil oficial do site `nodejs.org`, confere o SHA-256 publicado pelo próprio Node.js e o instala somente dentro de `.runtime/`, sem alterar o Windows e sem exigir conta de administrador. Em seguida, instala as dependências com `npm ci` na primeira execução ou quando o lockfile mudar e verifica as portas. A interface aguarda o banco e a API responderem antes de ocupar a porta 5173; o navegador só abre quando ambos estiverem prontos. A primeira instalação exige internet e acesso a `nodejs.org` e `registry.npmjs.org`; uma política da empresa pode exigir liberação pelo suporte de TI. Não é necessário instalar PostgreSQL.
 
-Se `.env` não existir, o iniciador cria uma configuração **somente para demonstração local**, usando o único login administrativo listado acima e a senha pública `Campo-demo-2026!`. Se `.env` já existir, ele é preservado. O banco `.data` também é preservado; senhas de usuários já cadastrados não são alteradas pelo iniciador. Para reinstalar as dependências manualmente, remova somente `node_modules/.sl-campo-lock` e execute novamente.
+Se `.env` não existir, o iniciador cria uma configuração **somente para demonstração local**, usando os dois acessos listados acima e a senha pública `Campo-demo-2026!`. Se `.env` já existir, ele é preservado. O banco `.data` também é preservado; senhas de usuários já cadastrados não são alteradas pelo iniciador. Para reinstalar as dependências manualmente, remova somente `node_modules/.sl-campo-lock` e execute novamente.
 
 O iniciador executa o modo de desenvolvimento. O cache de instalação fica em `.runtime/npm-cache`, acelerando novas tentativas, e o banco continua em `.data`. Se o sistema já estiver aberto, um segundo clique apenas abre o navegador. Se outro programa estiver usando as portas 3001 ou 5173, o iniciador informa isso sem encerrar o programa. Para instalar e testar o PWA ou publicar em HTTPS, siga as seções abaixo.
 
@@ -40,7 +41,7 @@ npm run preview
 # Com a API ainda em execução, testa build com service worker na porta 4173.
 ```
 
-`npm test` executa domínio, API, migração e sincronização em banco isolado. Os testes de navegador requerem Chromium em `/usr/bin/chromium`, Python e Playwright (`python3 -m pip install playwright`). Os comandos abaixo preparam automaticamente um banco temporário com dados fictícios e servidores nas portas 5191/5192. Não é necessário alterar `.env` nem preencher o banco da operação.
+`npm test` executa domínio, API, migração e sincronização em banco isolado. Os testes de navegador requerem Chromium em `/usr/bin/chromium`, Python, Playwright, ReportLab e Pillow (`python3 -m pip install playwright reportlab pillow`). Os comandos abaixo preparam automaticamente um banco temporário com dados fictícios e servidores nas portas 5191/5192. Não é necessário alterar `.env` nem preencher o banco da operação.
 
 ```sh
 npm run test:browser
@@ -49,14 +50,14 @@ npm run test:requests
 npm run test:lan
 ```
 
-A fixture 41250 e o técnico de teste só são criados no banco temporário por opt-in de `DEMO_SEED_EXAMPLES=true`; mantenha essa flag desativada na operação. Para testar a atualização do PWA, gere o build e execute `npm run test:updates`.
+A fixture 41250 e o técnico adicional usado por ela só são criados no banco temporário por opt-in de `DEMO_SEED_EXAMPLES=true`; mantenha essa flag desativada na operação. O login `tecnico.teste@slcampo.local` continua disponível para homologar um chamado importado. Para testar a atualização do PWA, gere o build e execute `npm run test:updates`.
 
 Capturas e PDF ficam em `test-results/` (ignorado). Os testes não alteram a OS de referência. Para homologar em aparelhos reais, publique sob HTTPS e valide Chrome Android e Safari iOS. Instale pelo menu do navegador (Android) ou Compartilhar → Adicionar à Tela de Início (iOS). Primeira abertura e sincronização exigem conexão.
 
 ## Fluxo de uso
 
-1. Administrador cria a OS e define o responsável; sincroniza.
-2. Técnico entra e sincroniza ordens; abre OS e inicia atendimento.
+1. Administrador importa o PDF do chamado interno; o sistema lê os dados, anexa o original e atribui o técnico ativo.
+2. Técnico entra e sincroniza ordens; abre a OS, consulta o PDF interno e inicia o atendimento.
 3. Confere equipamento, registra laudo, fotos, solicitações na aba Peças e assinatura ou justificativa.
 4. Finaliza a visita e baixa os documentos. A OS permanece aberta.
 5. Administrador aprova e registra entrega. Em nova visita, técnico instala peças entregues e registra resultados.
@@ -147,11 +148,11 @@ Em seguida, “Excluir todos os técnicos” remove os técnicos e suas sessões
 
 Existem apenas os perfis **administrador** e **técnico**. O único login administrativo padrão é `admin@slcampo.local`; não há mais login de gestor. A senha do administrador existente é preservada na atualização. O banco permite somente um administrador ativo; o cadastro de novos usuários cria técnicos. O administrador também pode ser o responsável por um atendimento, sem criar um técnico fictício.
 
-Ao cadastrar ou editar uma OS, o responsável pode ser informado diretamente no campo **Nome do técnico**. O formulário não exibe mais uma lista de usuários e aceita o nome digitado mesmo quando o profissional não possui uma conta no sistema. Enquanto o técnico ainda não estiver definido, o campo pode ficar vazio e a OS exibirá **A definir**.
+Novos atendimentos são criados pelo botão **Importar chamado**. O administrador seleciona somente o PDF do chamado interno; número, cliente, unidade, equipamento, endereço, defeito informado e orientações são extraídos automaticamente. O arquivo original fica anexado na aba Documentos e disponível ao técnico responsável, inclusive depois da sincronização offline. O atendimento é atribuído ao técnico ativo cadastrado; enquanto não houver um, fica como **A definir** para o administrador ajustar.
 
 Na atualização, contas antigas de gestor e administradores adicionais são desativadas e vinculadas ao administrador principal. Suas referências em históricos são preservadas, as sessões antigas são revogadas e os dados das OS não são apagados. Ao entrar com o administrador, os rascunhos locais da conta antiga são recuperados automaticamente. Se já houver outro rascunho pendente para a mesma OS, a segunda cópia fica preservada para exportação em Configurações.
 
-Uma OS criada offline pode chegar ao servidor já com visita, peças e laudo preenchidos. Essa primeira sincronização é validada sem exigir que o cliente envie antes uma versão vazia. Rascunhos bloqueados pelos antigos avisos genéricos tentam novamente uma vez após atualizar. Fotografias grandes são comprimidas progressivamente antes do envio e, se houver outro campo inválido, o aviso informa qual campo corrigir. Os campos de medições elétricas e teste de bateria foram removidos do formulário e do PDF; dados antigos desses campos permanecem compatíveis no histórico bruto.
+Uma OS criada offline pode chegar ao servidor já com visita, peças e laudo preenchidos. Essa primeira sincronização é validada sem exigir que o cliente envie antes uma versão vazia. Rascunhos bloqueados pelos antigos avisos genéricos tentam novamente uma vez após atualizar. Fotografias grandes são comprimidas progressivamente antes do envio e, se houver outro campo inválido, o aviso informa qual campo corrigir. Os campos de defeito relatado e verificações mecânicas foram retirados do formulário do técnico; o defeito vindo do chamado interno continua no resumo e no PDF. Os campos de medições elétricas e teste de bateria também foram removidos. Ao marcar **Não** em evidência de mau uso, a descrição fica oculta e é limpa; ao marcar **Sim**, aparecem a descrição e os botões para fotografar ou escolher imagens.
 
 Cada OS possui o botão **Excluir atendimento**, visível somente ao administrador. A API também verifica essa permissão. A exclusão funciona inclusive para um rascunho ainda não enviado, é comunicada aos outros aparelhos e não exclui outras OS. A limpeza em lote continua disponível em Configurações.
 

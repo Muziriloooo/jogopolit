@@ -2,6 +2,7 @@
 import http.client,os,shutil,socket,subprocess,tempfile,time,uuid
 from pathlib import Path
 from playwright.sync_api import sync_playwright,expect
+from pdf_fixture import make_internal_pdf
 ROOT=Path(__file__).resolve().parents[1]
 PORT=5188
 LAN=os.environ.get('SL_LAN_HOST','192.0.2.10')
@@ -43,9 +44,8 @@ with tempfile.TemporaryDirectory() as tmp:
    login(phone,f'http://{LAN}:{PORT}','tecnico@slcampo.local')
    assert phone.evaluate('window.isSecureContext') is False
    assert phone.evaluate('typeof crypto.randomUUID')=='undefined'
-   computer.get_by_role('button',name='Nova ordem de serviço').click()
-   for label,value in [('Número da OS *',ORDER),('Cliente *','Cliente LAN'),('Unidade *','Unidade LAN'),('Equipamento *','Lavadora LAN')]:computer.get_by_label(label,exact=True).fill(value)
-   computer.get_by_label('Nome do técnico (opcional)',exact=True).fill('Lucas Ferreira');computer.get_by_role('button',name='Criar ordem de serviço').click()
+   source_pdf=make_internal_pdf(folder/'chamado-lan.pdf',ORDER,'Cliente LAN','Unidade LAN','Lavadora LAN')
+   computer.get_by_role('button',name='Importar chamado').click();computer.get_by_label('PDF do chamado interno').set_input_files(str(source_pdf));expect(computer.get_by_role('heading',name='Chamado #'+ORDER)).to_be_visible();computer.get_by_role('button',name='Criar atendimento pelo PDF').click()
    expect(phone.get_by_role('button',name=ORDER)).to_be_visible(timeout=25000)
    phone.get_by_role('button',name=ORDER).click();phone.get_by_role('button',name='INICIAR ATENDIMENTO',exact=True).click();expect(phone.get_by_text('Check-in registrado',exact=True)).to_be_visible()
    phone.get_by_role('button',name='Continuar',exact=True).click();phone.get_by_label('Diagnóstico técnico *',exact=True).fill('Laudo LAN preservado')
@@ -54,8 +54,8 @@ with tempfile.TemporaryDirectory() as tmp:
    computer.locator('.detail-tabs').get_by_role('button',name='Atendimento',exact=True).click()
    computer.get_by_role('button',name='Continuar',exact=True).click()
    expect(computer.get_by_label('Diagnóstico técnico *',exact=True)).to_have_value('Laudo LAN preservado',timeout=10000)
-   computer.get_by_label('Verificações mecânicas e resultados',exact=True).fill('Atualização do computador pela API')
-   expect(phone.get_by_label('Verificações mecânicas e resultados',exact=True)).to_have_value('Atualização do computador pela API',timeout=10000)
+   computer.get_by_label('Recomendações / observações',exact=True).fill('Atualização do computador pela API')
+   expect(phone.get_by_label('Recomendações / observações',exact=True)).to_have_value('Atualização do computador pela API',timeout=10000)
    computer.locator('.detail-tabs').get_by_role('button',name='Resumo',exact=True).click()
    phone.evaluate('window.lanMarker="active-visit"');computer.evaluate('window.lanMarker="desktop"')
    # A change to the source on the computer is served automatically to both origins.

@@ -6,7 +6,7 @@ import { randomBytes, createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { orderIdentifier, deletionIdentifiers } from '../shared/order-identifiers.js';
 import { example } from './seed.js';
-import { applyRequestedMaintenance } from './maintenance.js';
+import { applyRequestedMaintenance, ensureRequestedTestTechnician } from './maintenance.js';
 import {
   orderSchema,
   sanitize,
@@ -38,6 +38,8 @@ export async function createApp(db) {
   );
   app.use(express.json({ limit: '28mb' }));
   const demo = process.env.DEMO_MODE === 'true';
+  if (demo && (!process.env.DEMO_PASSWORD || process.env.DEMO_PASSWORD.length < 12))
+    throw Error('Defina DEMO_PASSWORD com pelo menos 12 caracteres.');
   if (
     process.env.NODE_ENV === 'production' &&
     (demo || process.env.COOKIE_SECURE !== 'true' || !process.env.DATABASE_URL)
@@ -46,8 +48,6 @@ export async function createApp(db) {
   const existing = await db.query('SELECT id FROM users LIMIT 1');
   if (!existing.rows.length) {
     if (demo) {
-      if (!process.env.DEMO_PASSWORD || process.env.DEMO_PASSWORD.length < 12)
-        throw Error('Defina DEMO_PASSWORD com pelo menos 12 caracteres.');
       for (const [id, name, email, role] of [
         ['adm-demo', 'Administrador', 'admin@slcampo.local', 'admin'],
       ])
@@ -86,6 +86,7 @@ export async function createApp(db) {
       ]);
     }
   }
+  if (demo) await ensureRequestedTestTechnician(db, process.env.DEMO_PASSWORD);
   await applyRequestedMaintenance(db);
   // Serialize work on the shared embedded/pooled connection; transactions cannot interleave.
   let tail = Promise.resolve();

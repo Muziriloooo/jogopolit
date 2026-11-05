@@ -1,8 +1,11 @@
 """Regression of the screenshots: offline first upload, legacy draft recovery, one admin, deletion."""
 import json,os,uuid
+from pathlib import Path
 from playwright.sync_api import sync_playwright,expect
+from pdf_fixture import make_internal_pdf
 URL=os.environ.get('SL_URL','http://127.0.0.1:5192')
 ORDER='E2E-REQUEST-'+uuid.uuid4().hex[:8]
+ART=Path('test-results');ART.mkdir(exist_ok=True)
 with sync_playwright() as p:
  browser=p.chromium.launch(executable_path='/usr/bin/chromium',args=['--no-sandbox','--disable-dev-shm-usage'])
  context=browser.new_context(viewport={'width':390,'height':844},is_mobile=True,has_touch=True);page=context.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
@@ -24,10 +27,10 @@ with sync_playwright() as p:
  expect(page.get_by_label('Diagnóstico técnico *',exact=True)).to_have_value('Laudo da conta anterior')
  # Fresh OS is created + visit filled entirely offline before ANY server creation.
  page.get_by_role('button',name='Voltar para as ordens').click();mobile_id='E2E-OFFLINE-'+uuid.uuid4().hex[:8]
- context.set_offline(True);page.get_by_role('button',name='Nova ordem de serviço').click()
- for label,value in [('Número da OS *',mobile_id),('Cliente *','Cliente offline'),('Unidade *','Unidade offline'),('Equipamento *','Equipamento offline')]:page.get_by_label(label,exact=True).fill(value)
- page.get_by_role('button',name='Criar ordem de serviço').click();page.get_by_role('button',name='INICIAR ATENDIMENTO',exact=True).click();page.get_by_role('button',name='Continuar',exact=True).click()
- page.get_by_label('Qual o defeito relatado? *',exact=True).fill('Defeito offline');page.get_by_label('Diagnóstico técnico *',exact=True).fill('Diagnóstico offline completo');page.get_by_label('Quais serviços foram executados? *',exact=True).fill('Serviço offline')
+ source_pdf=make_internal_pdf(ART/'chamado-offline.pdf',mobile_id,'Cliente offline','Unidade offline','Equipamento offline')
+ page.get_by_role('button',name='Importar chamado').click();page.get_by_label('PDF do chamado interno').set_input_files(str(source_pdf));expect(page.get_by_role('heading',name='Chamado #'+mobile_id)).to_be_visible();context.set_offline(True)
+ page.get_by_role('button',name='Criar atendimento pelo PDF').click();page.get_by_role('button',name='INICIAR ATENDIMENTO',exact=True).click();page.get_by_role('button',name='Continuar',exact=True).click()
+ assert page.get_by_label('Qual o defeito relatado? *',exact=True).count()==0;assert page.get_by_label('Verificações mecânicas e resultados',exact=True).count()==0;page.get_by_label('Diagnóstico técnico *',exact=True).fill('Diagnóstico offline completo');page.get_by_label('Quais serviços foram executados? *',exact=True).fill('Serviço offline')
  context.set_offline(False);expect(page.get_by_text('Sincronizado',exact=True)).to_be_visible(timeout=15000)
  record=next(r for r in context.request.get(URL+'/api/orders').json() if r['data']['id']==mobile_id);assert len(record['data']['visits'])==1
  # Adaptive image compression for existing drafts beyond the old schema limit.

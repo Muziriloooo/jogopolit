@@ -66,6 +66,9 @@ export type Order = {
   status: 'Pendente' | 'Em andamento' | 'Aguardando peças' | 'Concluída';
   technicianId: string;
   technicianName?: string;
+  reportedDefect?: string;
+  internalNotes?: string;
+  sourcePdf?: { name: string; data: string; uploadedAt: string };
   scheduled: string;
   createdAt: string;
   parts: Part[];

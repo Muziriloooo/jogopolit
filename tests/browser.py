@@ -1,6 +1,7 @@
 import os,json,uuid
 from pathlib import Path
 from playwright.sync_api import sync_playwright,expect
+from pdf_fixture import make_internal_pdf
 BASE=os.environ.get('SL_URL','http://127.0.0.1:5173')
 ART=Path('test-results');ART.mkdir(exist_ok=True)
 ORDER='E2E '+uuid.uuid4().hex[:8]+'/2026_A'
@@ -12,10 +13,8 @@ with sync_playwright() as p:
   page.goto(BASE);page.get_by_label('E-mail corporativo').fill(email);page.get_by_label('Senha',exact=True).fill('Campo-demo-2026!');page.get_by_role('button',name='Entrar no SL Campo').click();expect(page.get_by_role('heading',name='Olá,')).to_be_visible();expect(page.get_by_text('Shopping Maia',exact=True).first).to_be_visible(timeout=20000)
  login('admin@slcampo.local')
  page.screenshot(path=str(ART/'dashboard-desktop.png'),full_page=True)
- page.get_by_role('button',name='Nova ordem de serviço').click()
- for label,value in [('Número da OS *',ORDER),('Cliente *','Cliente de teste'),('Unidade *','Unidade de teste'),('Equipamento *','Lavadora de teste')]:page.get_by_label(label,exact=True).fill(value)
- page.get_by_label('Nome do técnico (opcional)',exact=True).fill('Lucas Ferreira')
- page.get_by_role('button',name='Criar ordem de serviço').click();expect(page.get_by_role('heading',name='Ordem de serviço')).to_be_visible()
+ source_pdf=make_internal_pdf(ART/'chamado-interno.pdf',ORDER,'Cliente de teste','Unidade de teste','Lavadora de teste')
+ page.get_by_role('button',name='Importar chamado').click();page.get_by_label('PDF do chamado interno').set_input_files(str(source_pdf));expect(page.get_by_role('heading',name='Chamado #'+ORDER)).to_be_visible();page.get_by_role('button',name='Criar atendimento pelo PDF').click();expect(page.get_by_role('heading',name='Ordem de serviço')).to_be_visible()
  page.get_by_role('button',name='Sincronizar',exact=True).click();expect(page.get_by_text('Sincronizado',exact=True)).to_be_visible(timeout=15000)
  page.get_by_role('button',name='Administrador').click();expect(page.get_by_role('heading',name='Vamos ao trabalho?')).to_be_visible()
  login('tecnico@slcampo.local')
@@ -25,7 +24,9 @@ with sync_playwright() as p:
  if os.environ.get('SL_OFFLINE'):
   page.evaluate('navigator.serviceWorker.ready');context.set_offline(True)
  page.get_by_role('button',name='Continuar',exact=True).click()
- for label,value in [('Qual o defeito relatado? *','Ruído no conjunto do rodo'),('Diagnóstico técnico *','Desgaste identificado na inspeção'),('Quais serviços foram executados? *','Limpeza e ajuste do conjunto')]:page.get_by_label(label,exact=True).fill(value)
+ assert page.get_by_label('Qual o defeito relatado? *',exact=True).count()==0;assert page.get_by_label('Verificações mecânicas e resultados',exact=True).count()==0
+ misuse=page.locator('.yesno').filter(has_text='Existe evidência de mau uso?');expect(page.get_by_label('Evidências / descrição do mau uso',exact=True)).to_have_count(0);misuse.get_by_role('button',name='Sim').click();expect(page.get_by_label('Evidências / descrição do mau uso',exact=True)).to_be_visible();expect(page.get_by_text('Tirar foto do mau uso',exact=True)).to_be_visible();misuse.get_by_role('button',name='Não').click();expect(page.get_by_label('Evidências / descrição do mau uso',exact=True)).to_have_count(0)
+ for label,value in [('Diagnóstico técnico *','Desgaste identificado na inspeção'),('Quais serviços foram executados? *','Limpeza e ajuste do conjunto')]:page.get_by_label(label,exact=True).fill(value)
  page.get_by_role('button',name='Continuar',exact=True).click()
  # Test actual image processing, IndexedDB persistence, captions.
  expect(page.get_by_text('Categoria das fotos',exact=True)).to_have_count(0)
@@ -46,6 +47,7 @@ with sync_playwright() as p:
  page.screenshot(path=str(ART/'assinatura-mobile.png'),full_page=True)
  page.get_by_role('button',name='Finalizar visita e registrar saída').click();expect(page.get_by_text('Visita 1 · Finalizada')).to_be_visible()
  page.get_by_role('button',name='Documentos',exact=True).click()
+ expect(page.get_by_role('button',name='Abrir PDF interno',exact=True)).to_be_visible()
  with page.expect_download() as info:page.get_by_role('button',name='Baixar PDF').nth(1).click()
  info.value.save_as(str(ART/'relatorio.pdf'));assert (ART/'relatorio.pdf').stat().st_size>5000
  if os.environ.get('SL_OFFLINE'):context.set_offline(False)

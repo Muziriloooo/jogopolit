@@ -1345,6 +1345,34 @@ textarea {
 .upload-area p {
   font-size: 11px;
 }
+.pdf-import {
+  position: relative;
+  display: block;
+  cursor: pointer;
+  text-align: center;
+}
+.pdf-import input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.import-preview,
+.conditional-field {
+  margin: 14px 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f8faff;
+}
+.import-preview h3,
+.import-preview p {
+  margin: 0 0 7px;
+}
+.conditional-field .upload-buttons {
+  justify-content: flex-start;
+  margin-top: 10px;
+}
 .upload-buttons {
   display: flex;
   gap: 12px;

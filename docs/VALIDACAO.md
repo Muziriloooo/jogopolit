@@ -56,3 +56,11 @@ A conta antiga de gestor fica arquivada e sem acesso, preservando suas referênc
 - A manutenção usa apenas o identificador exato 44918 e mantém seu marcador em `applied_maintenance`. Testes confirmam que a OS 41250 permaneceu e que uma segunda execução não criou nova exclusão/auditoria.
 
 A remoção do banco que roda no computador do usuário ocorrerá quando essa versão for instalada e a API reiniciada; esta tarefa não tem acesso direto à máquina particular.
+
+## Importação do chamado interno e formulário condicional
+
+- O PDF interno de teste foi lido no navegador e seus campos foram convertidos em atendimento sem redigitação. O arquivo original permanece anexado à OS e o acesso pelo técnico responsável foi validado na aba Documentos.
+- O formulário do técnico não exibe mais “Qual o defeito relatado?” nem “Verificações mecânicas e resultados”. O defeito recebido do PDF continua visível no resumo e no relatório técnico.
+- “Evidências / descrição do mau uso” fica oculto ao marcar **Não**. Ao marcar **Sim**, o navegador mostra a descrição e os controles de câmera/galeria; as imagens seguem para a coleção normal de fotografias do atendimento.
+- A inicialização demonstrativa cria uma única vez o login fictício `tecnico.teste@slcampo.local`, com a senha definida por `DEMO_PASSWORD`. A exclusão posterior pelo administrador é respeitada.
+- `npm test`: 33 testes passaram, incluindo o parser do chamado interno, permissões do técnico e criação idempotente do acesso de teste. O fluxo Chromium móvel importou um PDF, sincronizou o chamado, abriu o original como técnico, concluiu o atendimento, assinou e gerou os documentos.

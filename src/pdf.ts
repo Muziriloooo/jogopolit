@@ -66,10 +66,9 @@ export function report(order: Order, user: User, kind: 'OS' | 'Relatório técni
         : 'Em andamento',
     );
     line('Horímetro', v.hours.toLocaleString('pt-BR'));
-    line('Defeito relatado', v.defect);
+    line('Defeito relatado', v.defect || order.reportedDefect || 'Conforme chamado interno');
     line('Diagnóstico', v.diagnosis);
     line('Serviços executados', v.services);
-    line('Verificações mecânicas', v.mechanical);
     line('Equipamento funcionando', v.operational ? 'Sim' : 'Não');
     line('Mau uso', v.misuse ? 'Sim · ' + v.misuseNotes : 'Não · ' + v.misuseNotes);
     line('Retorno necessário', v.returnNeeded ? 'Sim' : 'Não');

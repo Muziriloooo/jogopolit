@@ -66,6 +66,18 @@ export const orderSchema = z.object({
   status: z.enum(['Pendente', 'Em andamento', 'Aguardando peças', 'Concluída']),
   technicianId: z.string(),
   technicianName: z.string().trim().max(150).optional(),
+  reportedDefect: z.string().max(5000).optional(),
+  internalNotes: z.string().max(5000).optional(),
+  sourcePdf: z
+    .object({
+      name: z.string().min(1).max(200),
+      data: z
+        .string()
+        .max(18000000)
+        .regex(/^data:application\/pdf;base64,[A-Za-z0-9+/=]+$/),
+      uploadedAt: z.iso.datetime({ offset: true }),
+    })
+    .optional(),
   scheduled: z.string(),
   createdAt: z.string(),
   parts: z
@@ -183,8 +195,8 @@ export function validateTransition(next, previous, user, { initial = false } = {
   for (const v of next.visits) {
     if (v.checkOut) {
       if (Date.parse(v.checkOut) < Date.parse(v.checkIn)) throw Error('Saída anterior à chegada.');
-      if (!v.defect.trim() || !v.diagnosis.trim() || !v.services.trim())
-        throw Error('Preencha defeito, diagnóstico e serviços.');
+      if (!v.diagnosis.trim() || !v.services.trim())
+        throw Error('Preencha diagnóstico e serviços.');
       if (
         v.signatureMode === 'Assinada' &&
         (!v.signature || !v.signer.trim() || !v.signerRole.trim())

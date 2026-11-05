@@ -39,18 +39,19 @@ async function setup(examples) {
     },
   };
 }
-test('instalação padrão começa sem chamados e sem técnicos', async () => {
+test('instalação padrão começa sem chamados e cria somente o técnico de teste solicitado', async () => {
   const f = await setup(false);
   try {
     assert.equal((await f.db.query('SELECT count(*)::int AS n FROM orders')).rows[0].n, 0);
     assert.equal(
       (await f.db.query("SELECT count(*)::int AS n FROM users WHERE role='tecnico'")).rows[0].n,
-      0,
+      1,
     );
     assert.deepEqual(
       (await f.db.query('SELECT role FROM users ORDER BY role')).rows.map((r) => r.role),
-      ['admin'],
+      ['admin', 'tecnico'],
     );
+    assert.ok(await f.login('tecnico.teste@slcampo.local'));
   } finally {
     await f.close();
   }
@@ -78,7 +79,7 @@ test('administrador zera chamados e técnicos, preserva acessos e impede restaur
     assert.ok((await f.req('/order-deletions', 'GET', undefined, tech)).data.includes('41250'));
     assert.equal((await f.req('/sync', 'POST', command, tech)).status, 410);
     assert.equal((await f.db.query('SELECT count(*)::int AS n FROM commands')).rows[0].n, 0);
-    assert.equal((await f.req('/technicians', 'DELETE', undefined, admin)).data.deleted, 1);
+    assert.equal((await f.req('/technicians', 'DELETE', undefined, admin)).data.deleted, 2);
     assert.deepEqual((await f.req('/users', 'GET', undefined, admin)).data, []);
     assert.equal((await f.req('/me', 'GET', undefined, tech)).status, 401);
     assert.equal((await f.req('/me', 'GET', undefined, admin)).status, 200);

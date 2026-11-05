@@ -1,3 +1,39 @@
+import bcrypt from 'bcryptjs';
+
+/** Creates the explicitly requested demo technician once, without recreating it after deletion. */
+export async function ensureRequestedTestTechnician(db, password) {
+  const key = 'requested-test-technician-v1';
+  if ((await db.query('SELECT id FROM applied_maintenance WHERE id=$1', [key])).rows.length) return;
+  await db.exec('BEGIN');
+  try {
+    const claimed = await db.query(
+      'INSERT INTO applied_maintenance(id) VALUES($1) ON CONFLICT(id) DO NOTHING RETURNING id',
+      [key],
+    );
+    if (!claimed.rows.length) {
+      await db.exec('COMMIT');
+      return;
+    }
+    const hash = await bcrypt.hash(password, 12);
+    await db.query(
+      'INSERT INTO users(id,name,email,password_hash,role) VALUES($1,$2,$3,$4,$5) ON CONFLICT(id) DO NOTHING',
+      ['tec-teste', 'Técnico de teste', 'tecnico.teste@slcampo.local', hash, 'tecnico'],
+    );
+    const admin = (
+      await db.query("SELECT id FROM users WHERE role='admin' AND disabled_at IS NULL LIMIT 1")
+    ).rows[0]?.id;
+    await db.query('INSERT INTO audit(user_id,order_id,action) VALUES($1,$2,$3)', [
+      admin || null,
+      '*',
+      'Criação solicitada do login Técnico de teste',
+    ]);
+    await db.exec('COMMIT');
+  } catch (error) {
+    await db.exec('ROLLBACK');
+    throw error;
+  }
+}
+
 /** Explicit one-time cleanup requested for OS 44918. Never clears other calls. */
 export async function applyRequestedMaintenance(db) {
   const key = 'requested-delete-order-44918-v1';
