@@ -23,13 +23,13 @@ O sistema inicia **sem chamados e sem técnicos**. Entre como administrador e ca
 
 ## Iniciar no Windows
 
-Instale o **Node.js 24 ou superior**, com npm, e dê dois cliques em `iniciar.bat` na pasta do projeto. Também é possível executá-lo pelo Prompt de Comando. Mantenha a janela aberta enquanto usar o sistema; `Ctrl+C` encerra os serviços.
+No Windows 10 ou 11, dê dois cliques em `iniciar.bat` na pasta completa do projeto. Também é possível executá-lo pelo Prompt de Comando. Mantenha a janela aberta enquanto usar o sistema; `Ctrl+C` encerra os serviços.
 
-O arquivo verifica o Node, instala dependências com `npm ci` na primeira execução e quando o lockfile mudar, e inicia a API e a interface. Aguarde o Vite informar o endereço no terminal e abra-o no navegador (porta padrão 5173). A primeira instalação exige internet. Não é necessário instalar PostgreSQL para a demonstração local.
+O arquivo verifica o Node.js 24 e o npm. Se não estiverem disponíveis, baixa automaticamente o pacote portátil oficial do site `nodejs.org`, confere o SHA-256 publicado pelo próprio Node.js e o instala somente dentro de `.runtime/`, sem alterar o Windows e sem exigir conta de administrador. Em seguida, instala as dependências com `npm ci` na primeira execução ou quando o lockfile mudar, verifica as portas, inicia a API/interface e abre o navegador automaticamente. A primeira instalação exige internet e acesso a `nodejs.org` e `registry.npmjs.org`; uma política da empresa pode exigir liberação pelo suporte de TI. Não é necessário instalar PostgreSQL.
 
 Se `.env` não existir, o iniciador cria uma configuração **somente para demonstração local**, usando o único login administrativo listado acima e a senha pública `Campo-demo-2026!`. Se `.env` já existir, ele é preservado. O banco `.data` também é preservado; senhas de usuários já cadastrados não são alteradas pelo iniciador. Para reinstalar as dependências manualmente, remova somente `node_modules/.sl-campo-lock` e execute novamente.
 
-O iniciador executa o modo de desenvolvimento. Para instalar e testar o PWA ou publicar em HTTPS, siga as seções abaixo. O arquivo foi revisado neste ambiente Linux; a execução no Windows ainda precisa ser validada.
+O iniciador executa o modo de desenvolvimento. O cache de instalação fica em `.runtime/npm-cache`, acelerando novas tentativas, e o banco continua em `.data`. Se o sistema já estiver aberto, um segundo clique apenas abre o navegador. Se outro programa estiver usando as portas 3001 ou 5173, o iniciador informa isso sem encerrar o programa. Para instalar e testar o PWA ou publicar em HTTPS, siga as seções abaixo.
 
 ## Testes e PWA
 

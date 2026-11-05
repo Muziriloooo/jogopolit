@@ -12,6 +12,7 @@ if not exist ".git" goto sem_repositorio
 git rev-parse --is-inside-work-tree >nul 2>&1
 if errorlevel 1 goto sem_repositorio
 for /f "delims=" %%L in ('git status --porcelain') do goto alteracoes_locais
+if exist ".runtime\node\node.exe" set "PATH=%CD%\.runtime\node;%PATH%"
 where node.exe >nul 2>&1
 if errorlevel 1 goto baixar
 node -e "const s=require('node:net').connect(5173,'127.0.0.1'); s.setTimeout(700); s.on('connect',()=>process.exit(0)); s.on('error',()=>process.exit(1)); s.on('timeout',()=>process.exit(1));"

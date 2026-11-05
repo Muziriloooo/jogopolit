@@ -1,5 +1,12 @@
 # Validação executada
 
+## Inicialização automática no Windows
+
+- `iniciar.bat` aceita Node.js 24 global ou prepara uma cópia portátil em `.runtime/node`, sem alterar o Windows ou exigir administrador. O instalador consulta somente `nodejs.org`, seleciona a versão 24 mais recente para x64/ARM64, valida o SHA-256 publicado e só então extrai o pacote.
+- O índice oficial foi consultado durante esta validação: os pacotes Windows x64 e ARM64 e seus checksums estavam disponíveis. A política da empresa ainda pode bloquear `nodejs.org` ou `registry.npmjs.org`; essa liberação depende do suporte de TI.
+- `npm test`: 30 testes passaram, incluindo a detecção de uma instância já aberta e de conflito de porta sem encerrar outros processos. `npm run build` e `npm run format:check` também passaram.
+- Este ambiente não possui um executor Windows ou acesso ao computador do usuário. O fluxo PowerShell/BAT foi verificado por código, pacotes oficiais e testes dos componentes Node; a execução completa do duplo clique precisa ocorrer no Windows de destino.
+
 Validação nesta instância em 04/11/2026:
 
 - `npm ci --cache /workspace/.cache/npm --no-audit --no-fund --offline`: instalação limpa pelo lockfile, 155 pacotes (antes da inclusão da ferramenta Prettier). A primeira tentativa foi interrompida pela sandbox na validação do binário esbuild; a execução autorizada concluiu sem desabilitar verificações. Prettier foi instalado posteriormente pelo npm com atualização do lockfile.
