@@ -44,3 +44,11 @@ Testes de navegador em Chromium cobrem layout móvel, mas não substituem homolo
 ## Rede local e atualizações
 
 O modo Vite detecta mudanças de conteúdo em `src`, `server`, `public`, `tooling` e manifests selecionados. O endpoint de versão não lê `.env`, `.data` ou arquivos do Git e não retorna código-fonte. A aplicação consulta essa versão no mesmo endereço usado pelo dispositivo; reload aguarda o salvamento e condições de segurança. O modo publicado mantém o fluxo de service worker/HTTPS. Nenhum dos dois modos apaga IndexedDB. O gerador de UUID usa Web Crypto `getRandomValues` quando a API `randomUUID` está indisponível em origens HTTP por IP.
+
+## Inicialização vazia e exclusões administrativas
+
+Por padrão, a demonstração cria apenas administrador e gestor, sem técnico e sem chamados. A fixture 41250 permanece disponível aos testes por `DEMO_SEED_EXAMPLES=true`, opt-in para um banco isolado.
+
+`DELETE /api/orders` é restrito a administrador, transacional e remove dados de atendimento e snapshots da tabela commands. `order_deletions` mantém somente ID, responsáveis e data da exclusão, sem fotos ou relatórios, para impedir recriação por sincronização antiga. O cliente consulta as exclusões antes de enviar sua fila e apaga também as entradas correspondentes do IndexedDB. Um envio antigo recebe HTTP 410.
+
+`DELETE /api/technicians` exige ausência de chamados atribuídos. Remove sessões, invalida o canal ao vivo desses usuários e preserva gestor/administrador. Nenhuma dessas ações executa automaticamente em bancos existentes só por atualizar o código.

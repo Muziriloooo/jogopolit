@@ -3248,3 +3248,19 @@ label {
   color: #966b00;
   font-weight: 500;
 }
+.delete-calls {
+  margin-top: 30px;
+  border-top: 1px solid #efd8d0;
+  padding-top: 8px;
+}
+.delete-calls h3 {
+  color: #9b392c;
+}
+.delete-calls p {
+  font-size: 12px;
+}
+.delete-calls .btn.danger {
+  color: #9b392c;
+  border-color: #e7c8c0;
+  background: #fff8f6;
+}

@@ -25,3 +25,11 @@ Não executados: aparelhos Android/iOS físicos, Safari/WebKit, PostgreSQL exter
 - `python3 tests/lan.py`: repetido incluindo explicitamente os dois sentidos de atualização de dados em origem HTTP insegura por IP (com relay de teste local devido à política da nuvem), além da atualização da versão do código.
 
 A rede particular e o computador Windows do usuário não são acessíveis a partir desta instância; a correção precisa ser instalada e o iniciador antigo reiniciado nesses aparelhos.
+
+## Limpeza solicitada da instância
+
+Exclusão executada pela interface autenticada de administrador: havia 10 chamados e 1 técnico (Lucas); após a operação, 0 chamados e 0 técnicos. O acesso administrativo permaneceu válido. Captura em `test-results/operacao-vazia.png`.
+
+Os testes de exclusão verificam inicialização vazia, bloqueio de exclusão por técnico/gestor, transação de limpeza, remoção dos snapshots, HTTP 410 para reenvio de chamado excluído, remoção das sessões dos técnicos, preservação de gestor/administrador e ausência de recriação dos exemplos no reinício.
+
+Essa limpeza foi feita na instância acessível desta tarefa. Um banco que esteja no computador do usuário precisa receber a mesma ação administrativa pela interface local.

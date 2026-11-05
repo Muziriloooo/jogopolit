@@ -15,13 +15,12 @@ npm run dev
 
 Vite: porta 5173, API: porta 3001. O motor PostgreSQL embarcado inicializa em `.data/postgres`. Não apague `.data` para atualizar dependências. As tabelas são criadas automaticamente de modo idempotente.
 
-Na primeira inicialização demonstrativa são criadas três contas com a senha configurada em `DEMO_PASSWORD`:
+Na primeira inicialização demonstrativa são criadas somente duas contas administrativas com a senha configurada em `DEMO_PASSWORD`:
 
-- `tecnico@slcampo.local`: Lucas Ferreira, técnico.
 - `gestor@slcampo.local`: Marina Costa, gestor.
 - `admin@slcampo.local`: administrador.
 
-Os usuários de exemplo são fictícios. A seed contém somente a OS 41250 anonimizada. Contas não são recriadas se o banco já tiver usuários. Mudar `DEMO_PASSWORD` após o primeiro boot não altera as senhas existentes.
+O sistema inicia **sem chamados e sem técnicos**. Entre como administrador e cadastre os técnicos em Equipe técnica → Adicionar usuário. Os usuários administrativos demonstrativos são fictícios. Contas não são recriadas se o banco já tiver usuários. Mudar `DEMO_PASSWORD` após o primeiro boot não altera senhas existentes.
 
 ## Iniciar no Windows
 
@@ -29,7 +28,7 @@ Instale o **Node.js 24 ou superior**, com npm, e dê dois cliques em `iniciar.ba
 
 O arquivo verifica o Node, instala dependências com `npm ci` na primeira execução e quando o lockfile mudar, e inicia a API e a interface. Aguarde o Vite informar o endereço no terminal e abra-o no navegador (porta padrão 5173). A primeira instalação exige internet. Não é necessário instalar PostgreSQL para a demonstração local.
 
-Se `.env` não existir, o iniciador cria uma configuração **somente para demonstração local**, usando as três contas listadas acima e a senha pública `Campo-demo-2026!`. Se `.env` já existir, ele é preservado. O banco `.data` também é preservado; senhas de usuários já cadastrados não são alteradas pelo iniciador. Para reinstalar as dependências manualmente, remova somente `node_modules/.sl-campo-lock` e execute novamente.
+Se `.env` não existir, o iniciador cria uma configuração **somente para demonstração local**, usando as duas contas administrativas listadas acima e a senha pública `Campo-demo-2026!`. Se `.env` já existir, ele é preservado. O banco `.data` também é preservado; senhas de usuários já cadastrados não são alteradas pelo iniciador. Para reinstalar as dependências manualmente, remova somente `node_modules/.sl-campo-lock` e execute novamente.
 
 O iniciador executa o modo de desenvolvimento. Para instalar e testar o PWA ou publicar em HTTPS, siga as seções abaixo. O arquivo foi revisado neste ambiente Linux; a execução no Windows ainda precisa ser validada.
 
@@ -42,7 +41,7 @@ npm run preview
 # Com a API ainda em execução, testa build com service worker na porta 4173.
 ```
 
-`npm test` executa domínio e API em banco isolado. Para os testes do navegador, use um banco demonstrativo de teste, `DEMO_PASSWORD=Campo-demo-2026!`, Chromium em `/usr/bin/chromium`, Python e Playwright (`python3 -m pip install playwright`). Os testes criam OS fictícias adicionais.
+`npm test` executa domínio e API em banco isolado. Para os testes do navegador, use um banco demonstrativo **isolado**, `DEMO_PASSWORD=Campo-demo-2026!`, `DEMO_SEED_EXAMPLES=true`, Chromium em `/usr/bin/chromium`, Python e Playwright (`python3 -m pip install playwright`). Os testes criam OS fictícias adicionais. Pare a execução normal antes de iniciar o ambiente de testes na mesma porta. Por exemplo: `DATA_DIR=.data/test-fixtures DEMO_MODE=true DEMO_SEED_EXAMPLES=true DEMO_PASSWORD=Campo-demo-2026! npm run dev`. Esse opt-in cria o técnico fictício e a OS 41250 somente nesse banco separado. Não use a flag no banco da operação.
 
 ```sh
 npm run test:browser
@@ -134,3 +133,9 @@ Para verificar releases de PWA sem depender de hospedagem externa, execute `npm 
 A rota `/api/events` precisa manter a conexão aberta, com cookies e sem buffering de proxy/CDN. O backend envia `X-Accel-Buffering: no` e heartbeat a cada 20 segundos; configure timeout de leitura maior que 5 minutos. O Vite encaminha essa rota pelo mesmo proxy de `/api`. Cada conexão é autenticada, não envia conteúdo de laudos/fotos e apenas avisa os usuários autorizados; as consultas continuam sujeitas às permissões. O reinício da API encerra os canais antes de fechar o banco, e os navegadores reconectam automaticamente.
 
 Com `npm run dev` e o banco demonstrativo ativo, `npm run test:realtime` abre duas sessões independentes (gestor no computador e técnico no layout móvel). O teste cria uma OS no computador, recebe no celular, envia diagnóstico do celular para o computador e envia uma medição no sentido inverso, sem recarregar. Também desconecta o celular, altera campos diferentes nos dois lados, reconecta com o canal SSE bloqueado e verifica a conciliação pelo fallback, sem duplicar a visita. O teste não equivale à verificação do roteador ou da instalação Windows do usuário.
+
+## Excluir chamados e técnicos
+
+Entre como **administrador** e abra **Configurações**. “Excluir todos os chamados” remove ordens, visitas, fotos, assinaturas, peças e cópias dos relatórios na fila de comandos do servidor. Usuários e configuração são preservados. A exclusão é propagada aos outros aparelhos; os IDs excluídos ficam registrados como tombstones mínimos para impedir que um aparelho offline restaure os chamados posteriormente. Esses números não podem ser reutilizados.
+
+Em seguida, “Excluir todos os técnicos” remove os técnicos e suas sessões, preservando administradores e gestores. O servidor bloqueia a exclusão enquanto houver chamados atribuídos. Ações estão restritas ao perfil administrador e pedem confirmação na interface. Os exemplos não são recriados ao reiniciar. A atualização do código sozinha não apaga bancos que estejam em outro computador: use essas ações na instalação correspondente.

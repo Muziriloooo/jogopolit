@@ -8,3 +8,5 @@ CREATE INDEX IF NOT EXISTS orders_technician ON orders(technician_id);
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS order_access ON orders;
 CREATE POLICY order_access ON orders USING (current_setting('app.role',true) IN ('admin','gestor') OR technician_id=current_setting('app.user_id',true)) WITH CHECK (current_setting('app.role',true) IN ('admin','gestor') OR technician_id=current_setting('app.user_id',true));
+-- Minimal tombstones prevent deleted calls from returning from an offline device.
+CREATE TABLE IF NOT EXISTS order_deletions(id text PRIMARY KEY, technician_id text REFERENCES users(id), deleted_by text REFERENCES users(id), deleted_at timestamptz NOT NULL DEFAULT now());

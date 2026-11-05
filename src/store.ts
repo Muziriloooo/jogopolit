@@ -19,6 +19,9 @@ export async function load(user: User): Promise<RecordOrder[]> {
 export async function save(user: User, record: RecordOrder) {
   await (await db).put('orders', { key: user.id + ':' + record.data.id, owner: user.id, record });
 }
+export async function removeOrder(user: User, id: string) {
+  await (await db).delete('orders', user.id + ':' + id);
+}
 export async function clearDevice() {
   const d = await db;
   await d.clear('orders');

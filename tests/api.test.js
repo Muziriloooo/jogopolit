@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import { createApp } from '../server/app.js';
 test('API: sessions, role isolation, no prices, idempotency, conflict and audit', async () => {
   process.env.DEMO_MODE = 'true';
+  process.env.DEMO_SEED_EXAMPLES = 'true';
   process.env.DEMO_PASSWORD = 'Only-for-tests-2026';
   const db = new PGlite();
   await db.exec(await fs.readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));

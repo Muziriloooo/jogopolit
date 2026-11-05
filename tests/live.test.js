@@ -12,6 +12,7 @@ const wait = async (predicate) => {
 };
 test('tempo real autenticado avisa gestor e técnicos autorizados, inclusive reatribuição', async () => {
   process.env.DEMO_MODE = 'true';
+  process.env.DEMO_SEED_EXAMPLES = 'true';
   process.env.DEMO_PASSWORD = 'Only-for-live-tests';
   const db = new PGlite();
   await db.exec(await fs.readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));

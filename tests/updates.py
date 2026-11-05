@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory() as tmp:
   def end_headers(self):self.send_header('Cache-Control','no-store');super().end_headers()
   def do_GET(self):
    if self.path.startswith('/api/'):
-    if authenticated['enabled'] and self.path in ['/api/me','/api/orders','/api/users']:
+    if authenticated['enabled'] and self.path in ['/api/me','/api/orders','/api/users','/api/order-deletions']:
      payload={'user':{'id':'update-test','name':'Teste','email':'test@local.test','role':'tecnico'},'demo':True} if self.path=='/api/me' else []
      self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers();self.wfile.write(json.dumps(payload).encode());return
     self.send_response(401);self.send_header('Content-Type','application/json');self.end_headers();self.wfile.write(b'{"error":"Entre novamente"}');return

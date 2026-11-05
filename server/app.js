@@ -41,7 +41,6 @@ export async function createApp(db) {
       if (!process.env.DEMO_PASSWORD || process.env.DEMO_PASSWORD.length < 12)
         throw Error('Defina DEMO_PASSWORD com pelo menos 12 caracteres.');
       for (const [id, name, email, role] of [
-        ['tec-demo', 'Lucas Ferreira', 'tecnico@slcampo.local', 'tecnico'],
         ['gest-demo', 'Marina Costa', 'gestor@slcampo.local', 'gestor'],
         ['adm-demo', 'Administrador', 'admin@slcampo.local', 'admin'],
       ])
@@ -52,12 +51,22 @@ export async function createApp(db) {
           await bcrypt.hash(process.env.DEMO_PASSWORD, 12),
           role,
         ]);
-      const o = example();
-      await db.query('INSERT INTO orders(id,technician_id,data) VALUES($1,$2,$3)', [
-        o.id,
-        o.technicianId,
-        JSON.stringify(o),
-      ]);
+      // Examples are opt-in for isolated automated tests, never the default installation.
+      if (process.env.DEMO_SEED_EXAMPLES === 'true') {
+        await db.query('INSERT INTO users VALUES($1,$2,$3,$4,$5)', [
+          'tec-demo',
+          'Lucas Ferreira',
+          'tecnico@slcampo.local',
+          await bcrypt.hash(process.env.DEMO_PASSWORD, 12),
+          'tecnico',
+        ]);
+        const o = example();
+        await db.query('INSERT INTO orders(id,technician_id,data) VALUES($1,$2,$3)', [
+          o.id,
+          o.technicianId,
+          JSON.stringify(o),
+        ]);
+      }
     } else {
       if (!process.env.ADMIN_EMAIL || process.env.ADMIN_PASSWORD?.length < 12)
         throw Error('Configure ADMIN_EMAIL e ADMIN_PASSWORD (12+ caracteres).');
@@ -218,6 +227,7 @@ export async function createApp(db) {
     });
     res.flushHeaders();
     liveClients.add(res);
+    res.locals.liveUserId = req.user.id;
     const write = (data) => {
       if (!res.writableEnded && !res.destroyed) res.write(data);
     };
@@ -237,6 +247,128 @@ export async function createApp(db) {
       liveClients.delete(res);
       updates.off('orders', changed);
     });
+  });
+  app.delete('/api/technicians', async (req, res) => {
+    if (req.user.role !== 'admin')
+      return res.status(403).json({ error: 'Somente o administrador pode excluir técnicos.' });
+    try {
+      const result = await serial(async () => {
+        await db.exec('BEGIN');
+        try {
+          await db.query(
+            "SELECT set_config('app.role',$1,true),set_config('app.user_id',$2,true)",
+            [req.user.role, req.user.id],
+          );
+          const ids = (
+            await db.query("SELECT id FROM users WHERE role='tecnico' FOR UPDATE")
+          ).rows.map((row) => row.id);
+          if (
+            (
+              await db.query('SELECT id FROM orders WHERE technician_id=ANY($1::text[]) LIMIT 1', [
+                ids,
+              ])
+            ).rows.length
+          ) {
+            await db.exec('ROLLBACK');
+            return { blocked: true };
+          }
+          await db.query('DELETE FROM sessions WHERE user_id=ANY($1::text[])', [ids]);
+          await db.query('DELETE FROM commands WHERE user_id=ANY($1::text[])', [ids]);
+          await db.query('UPDATE audit SET user_id=NULL WHERE user_id=ANY($1::text[])', [ids]);
+          await db.query(
+            'UPDATE order_deletions SET technician_id=NULL WHERE technician_id=ANY($1::text[])',
+            [ids],
+          );
+          await db.query(
+            'UPDATE order_deletions SET deleted_by=NULL WHERE deleted_by=ANY($1::text[])',
+            [ids],
+          );
+          await db.query("DELETE FROM users WHERE role='tecnico' AND id=ANY($1::text[])", [ids]);
+          if (ids.length)
+            await db.query('INSERT INTO audit(user_id,order_id,action) VALUES($1,$2,$3)', [
+              req.user.id,
+              '*',
+              `Exclusão administrativa de ${ids.length} técnicos`,
+            ]);
+          await db.exec('COMMIT');
+          return { ids };
+        } catch (error) {
+          await db.exec('ROLLBACK');
+          throw error;
+        }
+      });
+      if (result.blocked)
+        return res.status(409).json({
+          error: 'Exclua ou redistribua os chamados atribuídos antes de excluir os técnicos.',
+        });
+      for (const response of liveClients)
+        if (result.ids.includes(response.locals.liveUserId)) response.end();
+      if (result.ids.length) updates.emit('orders', []);
+      res.json({ deleted: result.ids.length });
+    } catch {
+      res.status(503).json({ error: 'Não foi possível excluir os técnicos. Tente novamente.' });
+    }
+  });
+  app.get('/api/order-deletions', async (req, res) => {
+    const result = await serial(() =>
+      db.query(
+        req.user.role === 'tecnico'
+          ? 'SELECT id FROM order_deletions WHERE technician_id=$1'
+          : 'SELECT id FROM order_deletions',
+        req.user.role === 'tecnico' ? [req.user.id] : [],
+      ),
+    );
+    res.json(result.rows.map((row) => row.id));
+  });
+  app.delete('/api/orders', async (req, res) => {
+    if (req.user.role !== 'admin')
+      return res
+        .status(403)
+        .json({ error: 'Somente o administrador pode excluir todos os chamados.' });
+    try {
+      const removed = await serial(async () => {
+        await db.exec('BEGIN');
+        try {
+          await db.query(
+            "SELECT set_config('app.role',$1,true),set_config('app.user_id',$2,true)",
+            [req.user.role, req.user.id],
+          );
+          const rows = (await db.query('SELECT id,technician_id FROM orders FOR UPDATE')).rows;
+          const ids = rows.map((row) => row.id);
+          for (const row of rows)
+            await db.query(
+              'INSERT INTO order_deletions(id,technician_id,deleted_by) VALUES($1,$2,$3) ON CONFLICT(id) DO NOTHING',
+              [row.id, row.technician_id, req.user.id],
+            );
+          if (ids.length) {
+            await db.query('DELETE FROM commands WHERE order_id=ANY($1::text[])', [ids]);
+            await db.query('DELETE FROM audit WHERE order_id=ANY($1::text[])', [ids]);
+            await db.query('DELETE FROM orders WHERE id=ANY($1::text[])', [ids]);
+            await db.query('INSERT INTO audit(user_id,order_id,action) VALUES($1,$2,$3)', [
+              req.user.id,
+              '*',
+              `Exclusão administrativa de ${ids.length} chamados`,
+            ]);
+          }
+          await db.exec('COMMIT');
+          return rows;
+        } catch (error) {
+          await db.exec('ROLLBACK');
+          throw error;
+        }
+      });
+      if (removed.length)
+        updates.emit(
+          'orders',
+          removed.map((row) => row.technician_id),
+        );
+      res.json({ deleted: removed.length, ids: removed.map((row) => row.id) });
+    } catch {
+      res.status(503).json({
+        error:
+          'Não foi possível excluir os chamados. Nenhum registro foi alterado; tente novamente.',
+      });
+    }
   });
   app.get('/api/orders', async (req, res) => {
     const r = await actorQuery(
@@ -280,6 +412,12 @@ export async function createApp(db) {
             "SELECT set_config('app.role',$1,true),set_config('app.user_id',$2,true)",
             [user.role, user.id],
           );
+          if (
+            (await db.query('SELECT id FROM order_deletions WHERE id=$1', [next.id])).rows.length
+          ) {
+            await db.exec('ROLLBACK');
+            return { deleted: true };
+          }
           const cached = await db.query('SELECT user_id,result FROM commands WHERE id=$1', [
             commandId,
           ]);
@@ -364,6 +502,11 @@ export async function createApp(db) {
           throw e;
         }
       });
+      if (result.deleted)
+        return res.status(410).json({
+          error:
+            'Este chamado foi excluído pelo administrador e não pode ser restaurado pela sincronização.',
+        });
       if (result.conflict)
         return res.status(409).json({
           error:

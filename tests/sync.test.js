@@ -130,3 +130,12 @@ test('fotos adicionadas em dispositivos diferentes se mantêm sem duplicação',
   local.visits[0].photos = [{ id: 'same', caption: 'Alterada' }];
   assert.throws(() => mergeOrders(base, local, remote), /mesma informação/);
 });
+test('exclusão administrativa remove também rascunho local, sem reenviar', async () => {
+  const order = example();
+  const f = fixture([{ data: order, revision: 1, pending: true, commandId: 'offline' }], []);
+  f.io.deleted = async () => [order.id];
+  f.io.remove = async (id) => f.io.commit(f.local().filter((r) => r.data.id !== id));
+  await exchangeOrders(f.io);
+  assert.deepEqual(f.local(), []);
+  assert.equal(f.calls.length, 0);
+});

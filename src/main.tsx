@@ -34,7 +34,7 @@ import {
   Activity,
 } from 'lucide-react';
 import type { Order, User, RecordOrder, Visit, Part } from './types';
-import { api, load, save, session, clearDevice, compress } from './store';
+import { api, load, save, session, clearDevice, compress, removeOrder } from './store';
 import { report, money, date } from './pdf';
 import { watchUpdates } from './updates';
 import { watchLocalUpdates } from './local-updates';
@@ -106,6 +106,8 @@ function App() {
   });
   const syncLock = useRef(false);
   const syncAgain = useRef(false);
+  const deletedIds = useRef(new Set<string>());
+  const [deleting, setDeleting] = useState(false);
   const syncNotice = useRef<string | undefined>(undefined);
   const localWrites = useRef(Promise.resolve());
   const replace = (rows: RecordOrder[]) => {
@@ -146,6 +148,17 @@ function App() {
     try {
       const issues = await exchangeOrders({
         records: () => ordersRef.current,
+        deleted: async () => {
+          const ids: string[] = await api('/order-deletions');
+          deletedIds.current = new Set(ids);
+          return ids;
+        },
+        remove: async (id) => {
+          replace(ordersRef.current.filter((r) => r.data.id !== id));
+          setSelected((current) => (current === id ? undefined : current));
+          localWrites.current = localWrites.current.then(() => removeOrder(user, id));
+          await localWrites.current;
+        },
         id: uid,
         flush: () => localWrites.current,
         put: async (record) => {
@@ -1423,6 +1436,94 @@ function App() {
                       }
                     }}
                   />
+                  {user.role === 'admin' && (
+                    <div className="delete-calls">
+                      <h3>Excluir chamados atuais</h3>
+                      <p>
+                        Remove todas as ordens, visitas, peças, fotos e assinaturas dos chamados
+                        registrados no servidor. Usuários e configuração são preservados. Os outros
+                        aparelhos receberão a exclusão ao sincronizar.
+                      </p>
+                      <button
+                        className="btn danger"
+                        disabled={busy || deleting || !online || pending > 0 || orders.length === 0}
+                        onClick={async () => {
+                          if (
+                            !confirm(
+                              `Excluir todos os ${orders.length} chamados atuais? Esta ação não pode ser desfeita.`,
+                            )
+                          )
+                            return;
+                          setDeleting(true);
+                          try {
+                            await localWrites.current;
+                            const result = await api('/orders', { method: 'DELETE' });
+                            for (const id of result.ids) {
+                              deletedIds.current.add(id);
+                              localWrites.current = localWrites.current.then(() =>
+                                removeOrder(user, id),
+                              );
+                            }
+                            replace(
+                              ordersRef.current.filter((r) => !result.ids.includes(r.data.id)),
+                            );
+                            setSelected(undefined);
+                            await localWrites.current;
+                            flash(
+                              `${result.deleted} chamados excluídos. Usuários e configuração preservados.`,
+                            );
+                          } catch (error: any) {
+                            flash(error.message);
+                          } finally {
+                            setDeleting(false);
+                          }
+                        }}
+                      >
+                        <Trash2 size={17} />
+                        Excluir todos os chamados
+                      </button>
+                      {pending > 0 && <p>Sincronize os registros pendentes antes de excluir.</p>}
+                    </div>
+                  )}
+                  {user.role === 'admin' && (
+                    <div className="delete-calls">
+                      <h3>Excluir técnicos cadastrados</h3>
+                      <p>
+                        Remove os técnicos, incluindo suas sessões de acesso. Administradores e
+                        gestores são preservados. Exclua ou redistribua os chamados antes.
+                      </p>
+                      <button
+                        className="btn danger"
+                        disabled={
+                          busy ||
+                          deleting ||
+                          !online ||
+                          pending > 0 ||
+                          orders.length > 0 ||
+                          users.length === 0
+                        }
+                        onClick={async () => {
+                          if (!confirm(`Excluir todos os ${users.length} técnicos cadastrados?`))
+                            return;
+                          setDeleting(true);
+                          try {
+                            const result = await api('/technicians', { method: 'DELETE' });
+                            setUsers([]);
+                            flash(
+                              `${result.deleted} técnicos excluídos. Nenhum técnico cadastrado.`,
+                            );
+                          } catch (error: any) {
+                            flash(error.message);
+                          } finally {
+                            setDeleting(false);
+                          }
+                        }}
+                      >
+                        <Trash2 size={17} />
+                        Excluir todos os técnicos
+                      </button>
+                    </div>
+                  )}
                   <h3>Sessão</h3>
                   <p>
                     {user.email} · Perfil: {user.role}
@@ -1472,6 +1573,10 @@ function App() {
           users={users}
           close={() => setModal(false)}
           create={(o) => {
+            if (deletedIds.current.has(o.id)) {
+              flash('Este número de OS foi excluído. Utilize um novo número.');
+              return;
+            }
             if (orders.some((r) => r.data.id === o.id)) {
               flash('Já existe uma OS com este número.');
               return;

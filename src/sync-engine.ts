@@ -3,6 +3,8 @@ import type { Order, RecordOrder } from './types';
 type WireCommand = { commandId: string; baseRevision: number; data: Order };
 export type Exchange = {
   records: () => RecordOrder[];
+  deleted?: () => Promise<string[]>;
+  remove?: (id: string) => Promise<void>;
   id: () => string;
   put: (record: RecordOrder) => Promise<void>;
   flush: () => Promise<unknown>;
@@ -14,6 +16,11 @@ export type Exchange = {
 export async function exchangeOrders(io: Exchange): Promise<string[]> {
   const issues: string[] = [];
   await io.flush();
+  if (io.deleted && io.remove) {
+    const deleted = new Set(await io.deleted());
+    for (const record of io.records())
+      if (deleted.has(record.data.id)) await io.remove(record.data.id);
+  }
   for (const id of io
     .records()
     .filter((r) => r.pending && !r.error)
@@ -38,6 +45,10 @@ export async function exchangeOrders(io: Exchange): Promise<string[]> {
         );
       } catch (error: any) {
         if (error.status === 401) throw error;
+        if (error.status === 410 && io.remove) {
+          await io.remove(id);
+          break;
+        }
         const latest = io.records().find((r) => r.data.id === id)!;
         if (error.status === 409 && latest.baseData) {
           try {
