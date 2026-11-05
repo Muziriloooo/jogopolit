@@ -77,6 +77,12 @@ test('campos elétricos antigos são opcionais e validação informa o campo inc
   assert.equal(parsed.success, false);
   assert.match(validationMessage(parsed.error), /Horímetro/);
 });
+test('nome do técnico pode ficar vazio enquanto a contratação está pendente', () => {
+  const data = example();
+  data.technicianName = '';
+  const parsed = orderSchema.parse(data);
+  assert.equal(parsed.technicianName, '');
+});
 test('instalação e saída enviadas juntas preservam a instalação feita durante visita aberta', () => {
   const before = example();
   before.parts[0].status = 'Entregue';

@@ -13,7 +13,7 @@ with sync_playwright() as p:
  login(computer,'admin@slcampo.local');login(phone,'tecnico@slcampo.local')
  computer.get_by_role('button',name='Nova ordem de serviço').click()
  for label,value in [('Número da OS *',ORDER),('Cliente *','Cliente tempo real'),('Unidade *','Unidade tempo real'),('Equipamento *','Lavadora tempo real')]:computer.get_by_label(label,exact=True).fill(value)
- computer.get_by_label('Nome do técnico *',exact=True).fill('Lucas Ferreira');computer.get_by_role('button',name='Criar ordem de serviço').click()
+ computer.get_by_label('Nome do técnico (opcional)',exact=True).fill('Lucas Ferreira');computer.get_by_role('button',name='Criar ordem de serviço').click()
  expect(phone.get_by_role('button',name=ORDER)).to_be_visible(timeout=6000)
  phone.get_by_role('button',name=ORDER).click();phone.get_by_role('button',name='INICIAR ATENDIMENTO',exact=True).click()
  expect(computer.get_by_text('Visita 1 · Em andamento',exact=True)).to_be_visible(timeout=6000)

@@ -498,7 +498,7 @@ export async function createApp(db) {
               if (!prev.data.visits.some((old) => old.id === v.id)) {
                 v.technicianId = user.id;
                 v.technicianName =
-                  user.role === 'admin' ? next.technicianName || user.name : user.name;
+                  user.role === 'admin' ? next.technicianName?.trim() || 'A definir' : user.name;
               }
             next = validateTransition(next, prev.data, user);
           } else {

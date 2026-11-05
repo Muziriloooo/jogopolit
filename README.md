@@ -147,7 +147,7 @@ Em seguida, “Excluir todos os técnicos” remove os técnicos e suas sessões
 
 Existem apenas os perfis **administrador** e **técnico**. O único login administrativo padrão é `admin@slcampo.local`; não há mais login de gestor. A senha do administrador existente é preservada na atualização. O banco permite somente um administrador ativo; o cadastro de novos usuários cria técnicos. O administrador também pode ser o responsável por um atendimento, sem criar um técnico fictício.
 
-Ao cadastrar ou editar uma OS, o responsável é informado diretamente no campo **Nome do técnico**. O formulário não exibe mais uma lista de usuários e aceita o nome digitado mesmo quando o profissional não possui uma conta no sistema.
+Ao cadastrar ou editar uma OS, o responsável pode ser informado diretamente no campo **Nome do técnico**. O formulário não exibe mais uma lista de usuários e aceita o nome digitado mesmo quando o profissional não possui uma conta no sistema. Enquanto o técnico ainda não estiver definido, o campo pode ficar vazio e a OS exibirá **A definir**.
 
 Na atualização, contas antigas de gestor e administradores adicionais são desativadas e vinculadas ao administrador principal. Suas referências em históricos são preservadas, as sessões antigas são revogadas e os dados das OS não são apagados. Ao entrar com o administrador, os rascunhos locais da conta antiga são recuperados automaticamente. Se já houver outro rascunho pendente para a mesma OS, a segunda cópia fica preservada para exportação em Configurações.
 

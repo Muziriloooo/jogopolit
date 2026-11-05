@@ -31,6 +31,11 @@ export function report(order: Order, user: User, kind: 'OS' | 'Relatório técni
     pdf.setTextColor(30);
     y += 8;
   };
+  const assignedTechnician = Object.hasOwn(order, 'technicianName')
+    ? order.technicianName?.trim() || 'A definir'
+    : user.role === 'tecnico'
+      ? user.name
+      : order.technicianId;
   pdf.setFillColor(0, 27, 128);
   pdf.rect(0, 0, 210, 35, 'F');
   pdf.setFillColor(255, 190, 0);
@@ -51,12 +56,7 @@ export function report(order: Order, user: User, kind: 'OS' | 'Relatório técni
   line('OS fornecedor (referência)', order.supplierOrder || 'Não se aplica');
   for (const v of visit ? [visit] : order.visits) {
     title('Visita técnica');
-    line(
-      'Técnico responsável',
-      v.technicianName ||
-        order.technicianName ||
-        (user.role === 'tecnico' ? user.name : order.technicianId),
-    );
+    line('Técnico responsável', v.technicianName || assignedTechnician);
     line('Chegada', date(v.checkIn));
     line('Saída', date(v.checkOut));
     line(

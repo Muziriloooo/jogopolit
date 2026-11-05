@@ -62,7 +62,7 @@ export const orderSchema = z.object({
   priority: z.enum(['Baixa', 'Média', 'Alta', 'Urgente']),
   status: z.enum(['Pendente', 'Em andamento', 'Aguardando peças', 'Concluída']),
   technicianId: z.string(),
-  technicianName: z.string().trim().min(1).max(150).optional(),
+  technicianName: z.string().trim().max(150).optional(),
   scheduled: z.string(),
   createdAt: z.string(),
   parts: z

@@ -321,10 +321,13 @@ function App() {
   const manager = user?.role === 'admin';
   const responsibleUsers =
     user?.role === 'admin' ? [{ id: user.id, name: user.name, role: 'admin' }, ...users] : users;
-  const technicianName = (order: Order) =>
-    order.technicianName?.trim() ||
-    responsibleUsers.find((candidate) => candidate.id === order.technicianId)?.name ||
-    order.technicianId;
+  const technicianName = (order: Order) => {
+    if (Object.hasOwn(order, 'technicianName')) return order.technicianName?.trim() || 'A definir';
+    return (
+      responsibleUsers.find((candidate) => candidate.id === order.technicianId)?.name ||
+      order.technicianId
+    );
+  };
   const list = orders.filter(
     ({ data: o }) =>
       (filter === 'Todas' || o.status === filter) &&
@@ -683,9 +686,9 @@ function App() {
                       <label>
                         Nome do técnico
                         <input
-                          value={current.data.technicianName || technicianName(current.data)}
+                          value={current.data.technicianName ?? technicianName(current.data)}
                           maxLength={150}
-                          required
+                          placeholder="A definir"
                           onChange={(e) =>
                             update({ ...current.data, technicianName: e.target.value })
                           }
@@ -718,7 +721,7 @@ function App() {
                               const v: Visit = {
                                 id: uid(),
                                 technicianId: user.id,
-                                technicianName: current.data.technicianName || user.name,
+                                technicianName: current.data.technicianName?.trim() || 'A definir',
                                 checkIn: new Date().toISOString(),
                                 hours: current.data.hours,
                                 defect: '',
@@ -2655,8 +2658,13 @@ function NewOrder({
             </select>
           </label>
           <label>
-            Nome do técnico *
-            <input name="technicianName" required maxLength={150} autoComplete="name" />
+            Nome do técnico (opcional)
+            <input
+              name="technicianName"
+              maxLength={150}
+              autoComplete="name"
+              placeholder="A definir"
+            />
           </label>
           <label>
             Agendamento *<input name="scheduled" type="date" required defaultValue={day()} />
