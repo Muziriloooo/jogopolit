@@ -41,7 +41,7 @@ with sync_playwright() as p:
  page.get_by_role('button',name='Voltar para as ordens').click();page.get_by_role('button',name=ORDER).click();page.on('dialog',lambda d:d.accept());page.get_by_role('button',name='Excluir atendimento',exact=True).click();expect(page.get_by_text('Atendimento #'+ORDER+' excluído.',exact=True)).to_be_visible(timeout=10000)
  expect(tp.locator('.detail-tabs')).to_have_count(0,timeout=10000)
  rows=context.request.get(URL+'/api/orders').json();assert all(r['data']['id']!=ORDER for r in rows);assert any(r['data']['id']==mobile_id for r in rows)
- # Both deletion buttons must also cancel old drafts with numeric or formatted IDs.
+ # Individual deletion must also cancel old drafts with numeric or formatted IDs.
  legacy=[]
  for legacy_id in [44918,5544,'OS _777/2026.svg']:
   item=json.loads(json.dumps(draft));item['id']=legacy_id;item['visits']=[];item['status']='Pendente';item['unit']='Rascunho legado'
@@ -50,9 +50,10 @@ with sync_playwright() as p:
  page.reload();expect(page.get_by_role('heading',name='Olá, Administrador.')).to_be_visible()
  page.wait_for_function('''async()=>{const db=await new Promise(resolve=>{const r=indexedDB.open('sl-campo',1);r.onsuccess=()=>resolve(r.result)});const row=await new Promise(resolve=>{const r=db.transaction('orders').objectStore('orders').get('adm-demo:44918');r.onsuccess=()=>resolve(r.result)});db.close();return !row}''',timeout=15000)
  page.get_by_role('button',name='#5544',exact=False).click();page.get_by_role('button',name='Excluir atendimento',exact=True).click();expect(page.get_by_text('Atendimento #5544 excluído.',exact=True)).to_be_visible(timeout=10000)
- page.get_by_role('button',name='Ajustes',exact=True).click();page.get_by_role('button',name='Excluir todos os chamados',exact=True).click();expect(page.get_by_text('chamados excluídos.',exact=False)).to_be_visible(timeout=10000)
- assert context.request.get(URL+'/api/orders').json()==[]
- page.reload();expect(page.get_by_role('heading',name='Olá, Administrador.')).to_be_visible();expect(page.get_by_text('Nenhuma ordem por aqui',exact=True)).to_be_visible()
+ page.get_by_role('button',name='Ajustes',exact=True).click()
+ assert page.get_by_role('button',name='Excluir todos os chamados',exact=True).count()==0
+ assert page.get_by_role('button',name='Excluir todos os técnicos',exact=True).count()==0
+ assert any(r['data']['id']==mobile_id for r in context.request.get(URL+'/api/orders').json())
  assert not errors,errors
- print('PASS solicitações: rascunho antigo recuperado, OS nova iniciada offline sincronizada, campos removidos, foto grande comprimida, exclusão individual e em lote com IDs antigos; OS 44918 removida automaticamente; permissões e outras OS preservadas na exclusão individual.')
+ print('PASS solicitações: rascunho antigo recuperado, OS nova iniciada offline sincronizada, campos removidos, foto grande comprimida, exclusão individual com IDs antigos; opções de exclusão em lote ausentes; OS 44918 removida automaticamente; permissões e outras OS preservadas.')
  browser.close()

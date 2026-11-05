@@ -138,11 +138,9 @@ A rota `/api/events` precisa manter a conexão aberta, com cookies e sem bufferi
 
 `npm run test:realtime` prepara um banco temporário isolado e abre duas sessões independentes (administrador no computador e técnico no layout móvel). O teste cria uma OS no computador, recebe no celular, envia diagnóstico do celular para o computador e envia uma medição no sentido inverso, sem recarregar. Também desconecta o celular, altera campos diferentes nos dois lados, reconecta com o canal SSE bloqueado e verifica a conciliação pelo fallback, sem duplicar a visita. O teste não equivale à verificação do roteador ou da instalação Windows do usuário.
 
-## Excluir chamados e técnicos
+## Excluir atendimento
 
-Entre como **administrador** e abra **Configurações**. “Excluir todos os chamados” remove ordens, visitas, fotos, assinaturas, peças e cópias dos relatórios na fila de comandos do servidor. Usuários e configuração são preservados. A exclusão é propagada aos outros aparelhos; os IDs excluídos ficam registrados como tombstones mínimos para impedir que um aparelho offline restaure os chamados posteriormente. Esses números não podem ser reutilizados.
-
-Em seguida, “Excluir todos os técnicos” remove os técnicos e suas sessões, preservando o administrador. O servidor bloqueia a exclusão enquanto houver chamados atribuídos. Ações estão restritas ao perfil administrador e pedem confirmação na interface. Os exemplos não são recriados ao reiniciar. A atualização do código sozinha não apaga bancos que estejam em outro computador: use essas ações na instalação correspondente.
+Cada OS possui o botão **Excluir atendimento**, visível somente ao administrador. A exclusão remove somente o chamado aberto e é propagada aos outros aparelhos; o identificador excluído fica registrado para impedir que um aparelho offline restaure o atendimento. A tela de Configurações não oferece exclusão de todos os chamados nem exclusão de todos os técnicos.
 
 ## Login administrativo único e correções de sincronização
 

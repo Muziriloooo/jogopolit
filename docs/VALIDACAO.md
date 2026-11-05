@@ -49,10 +49,10 @@ Essa limpeza foi feita na instância acessível desta tarefa. Um banco que estej
 
 A conta antiga de gestor fica arquivada e sem acesso, preservando suas referências históricas. A senha do administrador principal não é alterada.
 
-## Exclusões individual/em lote e OS 44918
+## Exclusão individual e OS 44918
 
-- `npm test`: 28 testes passaram. Novos casos cobrem IDs numéricos e antigos, chaves com barras/pontos/sublinhados, identidade primária diferente do JSON interno, recusa de requisição malformada sem excluir dados e limpeza exclusiva/idempotente da OS 44918.
-- `tests/requests.py`, em banco temporário: os dois botões excluíram os rascunhos legados sem o aviso “Identificação de atendimento inválida”. O teste também inseriu um rascunho numérico 44918 no IndexedDB e confirmou sua remoção automática pela manutenção solicitada, preservando os outros registros até a ação explícita de exclusão em lote.
+- `npm test`: os casos cobrem IDs numéricos e antigos, chaves com barras/pontos/sublinhados, identidade primária diferente do JSON interno, recusa de requisição malformada sem excluir dados e limpeza exclusiva/idempotente da OS 44918.
+- `tests/requests.py`, em banco temporário: a exclusão individual removeu rascunhos legados sem o aviso “Identificação de atendimento inválida”, preservou os demais registros e confirmou que as opções de excluir todos os chamados e todos os técnicos não aparecem em Configurações.
 - A manutenção usa apenas o identificador exato 44918 e mantém seu marcador em `applied_maintenance`. Testes confirmam que a OS 41250 permaneceu e que uma segunda execução não criou nova exclusão/auditoria.
 
 A remoção do banco que roda no computador do usuário ocorrerá quando essa versão for instalada e a API reiniciada; esta tarefa não tem acesso direto à máquina particular.
