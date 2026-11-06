@@ -32,6 +32,8 @@ Se `.env` não existir, o iniciador cria uma configuração **somente para demon
 
 O iniciador executa o modo de desenvolvimento. O cache de instalação fica em `.runtime/npm-cache`, acelerando novas tentativas, e o banco continua em `.data`. Se o sistema já estiver aberto, um segundo clique apenas abre o navegador. Se outro programa estiver usando as portas 3001 ou 5173, o iniciador informa isso sem encerrar o programa. Para instalar e testar o PWA ou publicar em HTTPS, siga as seções abaixo.
 
+`atualizar.bat` funciona tanto em pastas clonadas com Git quanto em pastas extraídas de ZIP. Na cópia ZIP, ele baixa a branch `main`, verifica a estrutura do pacote e aplica apenas o código, preservando `.env`, `.data`, `.runtime`, `node_modules` e resultados locais. Antes de atualizar, feche a janela do `iniciar.bat` com `Ctrl+C`. Se a cópia ainda possuir o atualizador antigo que informa “exige uma cópia clonada com Git”, coloque `atualizar-zip.bat` na pasta do projeto e execute esse arquivo uma vez; depois, as próximas atualizações usam normalmente `atualizar.bat`.
+
 ## Testes e PWA
 
 ```sh
@@ -96,7 +98,7 @@ Este é o modo usado por `iniciar.bat`: computador em `http://localhost:5173/` e
 
 O iniciador mostra os IPs da máquina. A porta 5173 agora é fixa: se já estiver ocupada, a aplicação informa o erro em vez de subir silenciosamente em outra porta. Permita a porta 5173 somente na rede privada do Firewall do Windows. O celular não deve usar `localhost`, que se refere ao próprio aparelho. Se o roteador alterar o IP, utilize o novo endereço informado pelo iniciador.
 
-**Para receber esta correção pela primeira vez:** feche a janela anterior do sistema com `Ctrl+C`, atualize os arquivos (ou execute `atualizar.bat` se a pasta foi clonada com Git), execute `iniciar.bat` e recarregue a página uma vez em cada aparelho. Não apague `.env`, `.data` ou os dados do navegador. O atualizador preserva a configuração/banco e interrompe se houver alterações locais; exige Git e conexão com o GitHub. Cópias obtidas por ZIP precisam receber os novos arquivos manualmente, preservando os dados locais.
+**Para receber esta correção pela primeira vez:** feche a janela anterior do sistema com `Ctrl+C`, execute `atualizar.bat` e recarregue a página uma vez em cada aparelho. Não apague `.env`, `.data` ou os dados do navegador. O atualizador preserva a configuração e o banco. Em um repositório Git, ele interrompe se houver alterações locais; em uma cópia ZIP, baixa e verifica o pacote novo antes de sobrepor o código. A primeira correção de um atualizador ZIP antigo é feita com `atualizar-zip.bat`, conforme a seção de Windows.
 
 Depois disso, alterações nos arquivos do projeto são detectadas no computador e no celular por consulta HTTP a cada **3 segundos**, sem depender do WebSocket do Vite, service worker ou do indicador `navigator.onLine` do navegador. Isso também funciona no endereço HTTP por IP quando Android/iPhone informa “offline” por engano, mas ainda alcança o computador pelo Wi-Fi. O recarregamento espera o fim do preenchimento e a sincronização dos dados; um atendimento aberto na tela não é interrompido. Para aplicar a nova versão após preencher, sincronize e volte para a lista/início. Alterações de dados (OS, atribuições e laudos) são enviadas após aproximadamente 600 ms sem nova edição. O servidor avisa os outros aparelhos em tempo real e a consulta automática à API ocorre a cada 3 segundos como garantia adicional.
 

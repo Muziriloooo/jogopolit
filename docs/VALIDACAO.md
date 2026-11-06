@@ -71,3 +71,9 @@ A remoção do banco que roda no computador do usuário ocorrerá quando essa ve
 - `npm run test:lan` abriu o sistema por duas origens HTTP, forçou `navigator.onLine=false` no celular e confirmou criação, check-in e alterações do computador aparecendo no celular. Também confirmou atualização do código preservando o formulário em andamento.
 - `npm run test:realtime` confirmou computador → celular e celular → computador sem recarregar, além da reconciliação após desconexão e do fallback com o canal SSE bloqueado.
 - `npm test` passou com 34 casos e `npm run build` gerou o PWA com 12 arquivos preparados para uso offline.
+
+## Atualização de instalações extraídas de ZIP
+
+- `atualizar.bat` detecta automaticamente se a pasta possui Git. Sem `.git`, chama o atualizador PowerShell que baixa a branch `main`, valida o pacote e usa `robocopy` sem substituir `.env`, `.data`, `.runtime`, `node_modules` e resultados locais.
+- `atualizar-zip.bat` permite corrigir uma instalação que ainda possui o atualizador antigo: baixa somente o script novo pelo GitHub, executa a atualização e instala o `atualizar.bat` atual para os próximos usos.
+- `npm test` passou com 35 casos, incluindo a presença do fallback ZIP, das origens oficiais e das exclusões obrigatórias dos dados persistentes. Este ambiente não executa arquivos BAT/PowerShell do Windows; o fluxo completo precisa ser confirmado no computador Windows de destino.
