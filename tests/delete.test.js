@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { PGlite } from '@electric-sql/pglite';
 import fs from 'node:fs/promises';
 import { createApp } from '../server/app.js';
+import { example } from '../server/seed.js';
 async function setup(examples) {
   process.env.DEMO_MODE = 'true';
   process.env.DEMO_PASSWORD = 'Only-for-reset-tests';
@@ -52,6 +53,66 @@ test('instalação padrão começa sem chamados e cria somente o técnico de tes
       ['admin', 'tecnico'],
     );
     assert.ok(await f.login('tecnico.teste@slcampo.local'));
+  } finally {
+    await f.close();
+  }
+});
+test('chamado PDF é atribuído ao login técnico e corrige importação antiga do administrador', async () => {
+  const { assignImportedCallsToTestTechnician } = await import('../server/maintenance.js');
+  const f = await setup(false);
+  try {
+    const admin = await f.login('admin@slcampo.local');
+    const technician = await f.login('tecnico.teste@slcampo.local');
+    const imported = {
+      ...example(),
+      id: 'PDF-NOVO',
+      technicianId: 'adm-demo',
+      technicianName: 'Administrador',
+      status: 'Pendente',
+      parts: [],
+      visits: [],
+      sourcePdf: {
+        name: 'chamado.pdf',
+        data: 'data:application/pdf;base64,JVBERi0xLjQ=',
+        uploadedAt: new Date().toISOString(),
+      },
+    };
+    const created = await f.req(
+      '/sync',
+      'POST',
+      { commandId: crypto.randomUUID(), baseRevision: 0, data: imported },
+      admin,
+    );
+    assert.equal(created.status, 200, JSON.stringify(created.data));
+    assert.equal(created.data.data.technicianId, 'tec-teste');
+    assert.ok(
+      (await f.req('/orders', 'GET', undefined, technician)).data.some(
+        (record) => record.data.id === 'PDF-NOVO',
+      ),
+    );
+
+    const legacy = { ...imported, id: 'PDF-ANTIGO' };
+    await f.db.query('INSERT INTO orders(id,technician_id,data) VALUES($1,$2,$3)', [
+      legacy.id,
+      'adm-demo',
+      JSON.stringify(legacy),
+    ]);
+    await f.db.query('DELETE FROM applied_maintenance WHERE id=$1', [
+      'assign-imported-calls-to-test-technician-v1',
+    ]);
+    await assignImportedCallsToTestTechnician(f.db);
+    const repaired = (
+      await f.db.query('SELECT technician_id,data,revision FROM orders WHERE id=$1', [legacy.id])
+    ).rows[0];
+    assert.equal(repaired.technician_id, 'tec-teste');
+    assert.equal(repaired.data.technicianId, 'tec-teste');
+    assert.equal(repaired.data.technicianName, 'Técnico de teste');
+    assert.equal(repaired.revision, 2);
+    assert.ok(
+      (await f.req('/orders', 'GET', undefined, technician)).data.some(
+        (record) => record.data.id === legacy.id,
+      ),
+    );
   } finally {
     await f.close();
   }

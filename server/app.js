@@ -6,7 +6,11 @@ import { randomBytes, createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { orderIdentifier, deletionIdentifiers } from '../shared/order-identifiers.js';
 import { example } from './seed.js';
-import { applyRequestedMaintenance, ensureRequestedTestTechnician } from './maintenance.js';
+import {
+  applyRequestedMaintenance,
+  assignImportedCallsToTestTechnician,
+  ensureRequestedTestTechnician,
+} from './maintenance.js';
 import {
   orderSchema,
   sanitize,
@@ -86,7 +90,10 @@ export async function createApp(db) {
       ]);
     }
   }
-  if (demo) await ensureRequestedTestTechnician(db, process.env.DEMO_PASSWORD);
+  if (demo) {
+    await ensureRequestedTestTechnician(db, process.env.DEMO_PASSWORD);
+    await assignImportedCallsToTestTechnician(db);
+  }
   await applyRequestedMaintenance(db);
   // Serialize work on the shared embedded/pooled connection; transactions cannot interleave.
   let tail = Promise.resolve();
@@ -487,6 +494,29 @@ export async function createApp(db) {
           }
           const r = await db.query('SELECT * FROM orders WHERE id=$1 FOR UPDATE', [next.id]);
           const prev = r.rows[0];
+          if (!prev && user.role === 'admin' && next.sourcePdf) {
+            const selected = (
+              await db.query(
+                "SELECT id,name FROM users WHERE id=$1 AND role='tecnico' AND disabled_at IS NULL",
+                [next.technicianId],
+              )
+            ).rows[0];
+            const fallback = selected
+              ? undefined
+              : (
+                  await db.query(
+                    "SELECT id,name FROM users WHERE role='tecnico' AND disabled_at IS NULL ORDER BY CASE WHEN id='tec-teste' THEN 0 ELSE 1 END,name",
+                  )
+                ).rows[0];
+            const technician = selected || fallback;
+            if (!technician)
+              throw Error('Cadastre um técnico com login antes de importar o chamado.');
+            next = {
+              ...next,
+              technicianId: technician.id,
+              technicianName: technician.name,
+            };
+          }
           if (prev && user.role === 'tecnico' && prev.technician_id !== user.id)
             throw Error('OS não atribuída a você.');
           if (!prev && user.role === 'tecnico') throw Error('Somente o administrador cadastra OS.');

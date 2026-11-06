@@ -2632,13 +2632,13 @@ function NewOrder({
   const [parsed, setParsed] = useState<Order>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const technician = users[0];
   async function choose(file?: File) {
     if (!file) return;
     setLoading(true);
     setError('');
     try {
       const imported = await importInternalPdf(file);
-      const technician = users[0];
       setParsed({
         id: imported.fields.id,
         client: imported.fields.client,
@@ -2705,15 +2705,21 @@ function NewOrder({
           </p>
           <p>{parsed.reportedDefect || 'Problema descrito no PDF anexado.'}</p>
           <p className="muted">
-            Responsável: {parsed.technicianName || 'A definir'} · O PDF ficará disponível para o
-            técnico.
+            Responsável: {technician?.name || parsed.technicianName || 'A definir'} · O PDF ficará
+            disponível para o técnico.
           </p>
         </div>
       )}
       <button
         className="btn primary full"
         disabled={!parsed || loading}
-        onClick={() => create(parsed!)}
+        onClick={() =>
+          create({
+            ...parsed!,
+            technicianId: technician?.id || parsed!.technicianId,
+            technicianName: technician?.name || parsed!.technicianName,
+          })
+        }
       >
         <FileUp size={17} />
         Criar atendimento pelo PDF
