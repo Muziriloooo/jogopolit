@@ -30,6 +30,9 @@ with tempfile.TemporaryDirectory() as tmp:
   with sync_playwright() as p:
    browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox','--disable-dev-shm-usage'])
    desktop=browser.new_context(viewport={'width':1440,'height':1000});mobile=browser.new_context(viewport={'width':390,'height':844},is_mobile=True,has_touch=True)
+   # Some phones report navigator.onLine=false on a usable local Wi-Fi network.
+   # Same-origin API polling must still synchronize both devices.
+   mobile.add_init_script("Object.defineProperty(Navigator.prototype,'onLine',{configurable:true,get:()=>false})")
    # The managed cloud proxy denies direct LAN IP traffic. Relay this reserved
    # test address to the isolated loopback server; the browser still uses a real
    # insecure HTTP origin (no randomUUID/service worker). Never contact a user's PC.
@@ -42,6 +45,7 @@ with tempfile.TemporaryDirectory() as tmp:
     response=page.goto(url);print('Origin',url,'HTTP',response.status);page.get_by_label('E-mail corporativo').fill(email);page.get_by_label('Senha',exact=True).fill('Campo-demo-2026!');page.get_by_role('button',name='Entrar no SL Campo').click();expect(page.get_by_role('heading',name='Olá,')).to_be_visible();expect(page.get_by_text('Shopping Maia',exact=True).first).to_be_visible(timeout=20000)
    login(computer,f'http://127.0.0.1:{PORT}','admin@slcampo.local')
    login(phone,f'http://{LAN}:{PORT}','tecnico@slcampo.local')
+   assert phone.evaluate('navigator.onLine') is False
    assert phone.evaluate('window.isSecureContext') is False
    assert phone.evaluate('typeof crypto.randomUUID')=='undefined'
    source_pdf=make_internal_pdf(folder/'chamado-lan.pdf',ORDER,'Cliente LAN','Unidade LAN','Lavadora LAN')
@@ -72,7 +76,7 @@ with tempfile.TemporaryDirectory() as tmp:
    phone.get_by_role('button',name=ORDER).click();phone.get_by_role('button',name='Continuar atendimento').click();phone.get_by_role('button',name='Continuar',exact=True).click()
    expect(phone.get_by_label('Diagnóstico técnico *',exact=True)).to_have_value('Laudo LAN preservado')
    assert not errors,errors
-   print('PASS LAN: insecure HTTP phone UUID/check-in, desktop-to-phone OS sync, source update on both origins, deferred reload and preserved draft.')
+   print('PASS LAN: sync with stale navigator.onLine=false, insecure HTTP phone UUID/check-in, desktop-to-phone OS sync, source update on both origins, deferred reload and preserved draft.')
    browser.close()
  finally:
   process.terminate()

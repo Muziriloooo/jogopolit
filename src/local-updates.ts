@@ -10,14 +10,7 @@ export function watchLocalUpdates(options: {
   let changed = false;
   let reloading = false;
   async function check() {
-    if (
-      disposed ||
-      checking ||
-      reloading ||
-      !navigator.onLine ||
-      document.visibilityState === 'hidden'
-    )
-      return;
+    if (disposed || checking || reloading || document.visibilityState === 'hidden') return;
     checking = true;
     try {
       const response = await fetch('/__sl/version', { cache: 'no-store' });

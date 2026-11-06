@@ -64,3 +64,10 @@ A remoção do banco que roda no computador do usuário ocorrerá quando essa ve
 - “Evidências / descrição do mau uso” fica oculto ao marcar **Não**. Ao marcar **Sim**, o navegador mostra a descrição e os controles de câmera/galeria; as imagens seguem para a coleção normal de fotografias do atendimento.
 - A inicialização demonstrativa cria uma única vez o login fictício `tecnico.teste@slcampo.local`, com a senha definida por `DEMO_PASSWORD`. A exclusão posterior pelo administrador é respeitada.
 - `npm test`: 33 testes passaram, incluindo o parser do chamado interno, permissões do técnico e criação idempotente do acesso de teste. O fluxo Chromium móvel importou um PDF, sincronizou o chamado, abriu o original como técnico, concluiu o atendimento, assinou e gerou os documentos.
+
+## Sincronização em Wi-Fi com indicador móvel incorreto
+
+- A sincronização consulta a API compartilhada a cada 3 segundos, inclusive com SSE ativo, e não usa mais `navigator.onLine` como condição para enviar ou receber alterações.
+- `npm run test:lan` abriu o sistema por duas origens HTTP, forçou `navigator.onLine=false` no celular e confirmou criação, check-in e alterações do computador aparecendo no celular. Também confirmou atualização do código preservando o formulário em andamento.
+- `npm run test:realtime` confirmou computador → celular e celular → computador sem recarregar, além da reconciliação após desconexão e do fallback com o canal SSE bloqueado.
+- `npm test` passou com 33 casos e `npm run build` gerou o PWA com 12 arquivos preparados para uso offline.

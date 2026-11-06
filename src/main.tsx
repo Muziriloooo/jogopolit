@@ -151,7 +151,7 @@ function App() {
     };
   }, []);
   async function sync() {
-    if (boot || !user || !navigator.onLine || syncLock.current || deleteLock.current) return;
+    if (boot || !user || syncLock.current || deleteLock.current) return;
     syncLock.current = true;
     setBusy(true);
     try {
@@ -188,6 +188,7 @@ function App() {
           await localWrites.current;
         },
       });
+      setOnline(true);
       setLastSynced(new Date().toLocaleTimeString('pt-BR'));
       const unresolved = ordersRef.current
         .filter((r) => r.pending && r.error)
@@ -204,6 +205,7 @@ function App() {
       setUsers(await api('/users'));
     } catch (e: any) {
       if (e.status === 401) setLoginNeeded(true);
+      if (!e.status) setOnline(false);
       const message = e.message || 'Sem conexão. Dados mantidos no dispositivo.';
       syncNotice.current = message;
       setNotice(message);
@@ -217,12 +219,13 @@ function App() {
     }
   }
   useEffect(() => {
-    if (user && online) {
-      sync();
-      const timer = setInterval(sync, live ? 30000 : 3000);
-      return () => clearInterval(timer);
-    }
-  }, [user?.id, online, live, boot]);
+    if (!user || boot) return;
+    void sync();
+    // Always verify the shared server directly. Mobile browsers can report
+    // navigator.onLine=false while the computer is reachable over local Wi-Fi.
+    const timer = setInterval(() => void sync(), 3000);
+    return () => clearInterval(timer);
+  }, [user?.id, boot]);
   useEffect(() => {
     if (!user || !online || loginNeeded) {
       setLive(false);
@@ -254,13 +257,13 @@ function App() {
       window.removeEventListener('focus', refresh);
       document.removeEventListener('visibilitychange', refresh);
     };
-  }, [user?.id, online]);
+  }, [user?.id]);
   // Send completed local edits promptly; the regular poll still fetches remote edits.
   useEffect(() => {
-    if (!user || !online || !orders.some((r) => r.pending && !r.error)) return;
+    if (!user || !orders.some((r) => r.pending && !r.error)) return;
     const timer = setTimeout(() => void sync(), 600);
     return () => clearTimeout(timer);
-  }, [orders, user?.id, online]);
+  }, [orders, user?.id]);
   useEffect(() => {
     const watch = import.meta.env.DEV ? watchLocalUpdates : watchUpdates;
     if (import.meta.env.PROD && !('serviceWorker' in navigator)) return;
@@ -513,7 +516,7 @@ function App() {
             <button
               className="sync-button"
               onClick={sync}
-              disabled={busy || !online}
+              disabled={busy}
               aria-label="Sincronizar"
               title={lastSynced ? `Última sincronização: ${lastSynced}` : 'Sincronizar'}
             >

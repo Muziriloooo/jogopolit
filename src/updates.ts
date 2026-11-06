@@ -15,7 +15,7 @@ export function watchUpdates(options: {
   const watched = new Set<ServiceWorker>();
 
   async function apply() {
-    if (disposed || applying || reloaded || !navigator.onLine || !options.safeToReload()) return;
+    if (disposed || applying || reloaded || !options.safeToReload()) return;
     if (!registration?.waiting && !controllerChanged) return;
     applying = true;
     try {
@@ -44,7 +44,7 @@ export function watchUpdates(options: {
     worker.addEventListener('statechange', waiting);
   }
   async function check() {
-    if (disposed || checking || !navigator.onLine || document.visibilityState === 'hidden') return;
+    if (disposed || checking || document.visibilityState === 'hidden') return;
     checking = true;
     try {
       await registration?.update();
