@@ -77,3 +77,10 @@ A remoção do banco que roda no computador do usuário ocorrerá quando essa ve
 - `atualizar.bat` detecta automaticamente se a pasta possui Git. Sem `.git`, chama o atualizador PowerShell que baixa a branch `main`, valida o pacote e usa `robocopy` sem substituir `.env`, `.data`, `.runtime`, `node_modules` e resultados locais.
 - `atualizar-zip.bat` permite corrigir uma instalação que ainda possui o atualizador antigo: baixa somente o script novo pelo GitHub, executa a atualização e instala o `atualizar.bat` atual para os próximos usos.
 - `npm test` passou com 35 casos, incluindo a presença do fallback ZIP, das origens oficiais e das exclusões obrigatórias dos dados persistentes. Este ambiente não executa arquivos BAT/PowerShell do Windows; o fluxo completo precisa ser confirmado no computador Windows de destino.
+
+## Operação com um único técnico
+
+- O único login técnico ativo lista todos os chamados, inclusive uma OS antiga ainda vinculada ao administrador. Ao enviar a primeira alteração, o servidor assume a OS para essa conta sem liberar custos.
+- Com dois técnicos ativos, os testes de isolamento continuam confirmando que um técnico não vê nem altera a OS do outro.
+- A manutenção remove a conta demonstrativa antiga `tec-demo` (Lucas), revoga sua sessão e transfere suas OS para `tec-teste`, preservando o conteúdo dos atendimentos.
+- `npm test` passou com 37 casos, incluindo chamado sem PDF atribuído ao administrador, recebimento pelo único técnico, remoção de Lucas e atualização persistente de `technician_id`.

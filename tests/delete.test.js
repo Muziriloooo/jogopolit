@@ -117,6 +117,95 @@ test('chamado PDF é atribuído ao login técnico e corrige importação antiga 
     await f.close();
   }
 });
+test('único técnico visualiza e assume chamado mesmo se estiver atribuído ao administrador', async () => {
+  const f = await setup(false);
+  try {
+    const technician = await f.login('tecnico.teste@slcampo.local');
+    const data = {
+      ...example(),
+      id: 'CHAMADO-UNICO-TECNICO',
+      technicianId: 'adm-demo',
+      technicianName: 'Administrador',
+      status: 'Pendente',
+      parts: [],
+      visits: [],
+    };
+    delete data.sourcePdf;
+    await f.db.query('INSERT INTO orders(id,technician_id,data) VALUES($1,$2,$3)', [
+      data.id,
+      'adm-demo',
+      JSON.stringify(data),
+    ]);
+    const visible = (await f.req('/orders', 'GET', undefined, technician)).data.find(
+      (record) => record.data.id === data.id,
+    );
+    assert.ok(visible);
+    const claimed = await f.req(
+      '/sync',
+      'POST',
+      { commandId: crypto.randomUUID(), baseRevision: visible.revision, data: visible.data },
+      technician,
+    );
+    assert.equal(claimed.status, 200, JSON.stringify(claimed.data));
+    assert.equal(claimed.data.data.technicianId, 'tec-teste');
+    assert.equal(
+      (await f.db.query('SELECT technician_id FROM orders WHERE id=$1', [data.id])).rows[0]
+        .technician_id,
+      'tec-teste',
+    );
+  } finally {
+    await f.close();
+  }
+});
+test('remove Lucas legado e transfere seus chamados ao técnico de teste', async () => {
+  const { removeLegacyDemoTechnician } = await import('../server/maintenance.js');
+  const f = await setup(false);
+  try {
+    const hash = (await f.db.query("SELECT password_hash FROM users WHERE id='tec-teste'")).rows[0]
+      .password_hash;
+    await f.db.query('INSERT INTO users(id,name,email,password_hash,role) VALUES($1,$2,$3,$4,$5)', [
+      'tec-demo',
+      'Lucas Ferreira',
+      'tecnico-antigo@slcampo.local',
+      hash,
+      'tecnico',
+    ]);
+    const data = {
+      ...example(),
+      id: 'CHAMADO-LUCAS-LEGADO',
+      technicianId: 'tec-demo',
+      technicianName: 'Lucas Ferreira',
+    };
+    await f.db.query('INSERT INTO orders(id,technician_id,data) VALUES($1,$2,$3)', [
+      data.id,
+      'tec-demo',
+      JSON.stringify(data),
+    ]);
+    await f.db.query('DELETE FROM applied_maintenance WHERE id=$1', [
+      'remove-legacy-demo-technician-v1',
+    ]);
+    await removeLegacyDemoTechnician(f.db);
+    assert.equal(
+      (await f.db.query("SELECT count(*)::int AS count FROM users WHERE id='tec-demo'")).rows[0]
+        .count,
+      0,
+    );
+    assert.equal(
+      (await f.db.query("SELECT count(*)::int AS count FROM users WHERE role='tecnico'")).rows[0]
+        .count,
+      1,
+    );
+    const transferred = (
+      await f.db.query('SELECT technician_id,data,revision FROM orders WHERE id=$1', [data.id])
+    ).rows[0];
+    assert.equal(transferred.technician_id, 'tec-teste');
+    assert.equal(transferred.data.technicianId, 'tec-teste');
+    assert.equal(transferred.data.technicianName, 'Técnico de teste');
+    assert.equal(transferred.revision, 2);
+  } finally {
+    await f.close();
+  }
+});
 test('administrador zera chamados e técnicos, preserva acessos e impede restauração offline', async () => {
   const f = await setup(true);
   try {

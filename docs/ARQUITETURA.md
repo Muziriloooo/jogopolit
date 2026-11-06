@@ -29,7 +29,7 @@ A fila envia após 600 ms sem nova edição. A rota SSE autenticada avisa os apa
 
 ## Segurança e implantação
 
-Um único grupo/organização, isolamento de ordens por técnico atribuído e visibilidade global somente para administrador. Não é SaaS multiempresa. RLS adicional em orders; queries usam identidade de transação. Use papel de banco de aplicação não proprietário e sem BYPASSRLS em produção. Políticas SQL não substituem autorização da API. Credenciais do banco pertencem somente ao backend.
+Um único grupo/organização, isolamento de ordens por técnico atribuído e visibilidade global para administrador. Quando existe exatamente um técnico ativo, a API permite que ele liste todas as OS e assuma automaticamente chamados vinculados ao administrador ou a uma conta anterior; os custos continuam removidos. Com dois ou mais técnicos, a API e o RLS mantêm o isolamento por `technician_id`. Não é SaaS multiempresa. RLS adicional em orders; queries usam identidade de transação. Use papel de banco de aplicação não proprietário e sem BYPASSRLS em produção. Políticas SQL não substituem autorização da API. Credenciais do banco pertencem somente ao backend.
 
 Fotos/assinaturas são dados pessoais. Servir sob HTTPS, configurar retenção, base legal, transparência, controle de dispositivos, backups criptografados, monitoramento e processo de atendimento a titulares antes do uso real. Assinatura desenhada é registro de ciência; não é assinatura ICP-Brasil ou prova criptográfica de identidade. PDFs baixados ficam sob responsabilidade do usuário.
 
@@ -47,7 +47,7 @@ O modo Vite detecta mudanças de conteúdo em `src`, `server`, `public`, `toolin
 
 ## Inicialização vazia e exclusões administrativas
 
-Por padrão, a demonstração cria apenas o administrador, sem técnico e sem chamados. A fixture 41250 permanece disponível aos testes por `DEMO_SEED_EXAMPLES=true`, opt-in para um banco isolado.
+Por padrão, a demonstração cria o administrador e o técnico de teste solicitado, sem chamados. A fixture 41250 permanece disponível aos testes por `DEMO_SEED_EXAMPLES=true`, opt-in para um banco isolado.
 
 `DELETE /api/orders` é restrito a administrador, transacional e remove dados de atendimento e snapshots da tabela commands. `order_deletions` mantém somente ID, responsáveis e data da exclusão, sem fotos ou relatórios, para impedir recriação por sincronização antiga. O cliente consulta as exclusões antes de enviar sua fila e apaga também as entradas correspondentes do IndexedDB. Um envio antigo recebe HTTP 410.
 

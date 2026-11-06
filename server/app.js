@@ -10,6 +10,7 @@ import {
   applyRequestedMaintenance,
   assignImportedCallsToTestTechnician,
   ensureRequestedTestTechnician,
+  removeLegacyDemoTechnician,
 } from './maintenance.js';
 import {
   orderSchema,
@@ -92,6 +93,7 @@ export async function createApp(db) {
   }
   if (demo) {
     await ensureRequestedTestTechnician(db, process.env.DEMO_PASSWORD);
+    if (process.env.DEMO_SEED_EXAMPLES !== 'true') await removeLegacyDemoTechnician(db);
     await assignImportedCallsToTestTechnician(db);
   }
   await applyRequestedMaintenance(db);
@@ -250,7 +252,17 @@ export async function createApp(db) {
         throw e;
       }
     });
-  app.get('/api/events', (req, res) => {
+  const isOnlyTechnician = async (user) => {
+    if (user.role !== 'tecnico') return false;
+    const result = await serial(() =>
+      db.query(
+        "SELECT count(*)::int AS count FROM users WHERE role='tecnico' AND disabled_at IS NULL",
+      ),
+    );
+    return result.rows[0].count === 1;
+  };
+  app.get('/api/events', async (req, res) => {
+    const onlyTechnician = await isOnlyTechnician(req.user);
     res.set({
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-store',
@@ -265,7 +277,7 @@ export async function createApp(db) {
     };
     const send = () => write('data: {"type":"orders-changed"}\n\n');
     const changed = (audience) => {
-      if (req.user.role !== 'tecnico' || audience.includes(req.user.id)) send();
+      if (req.user.role !== 'tecnico' || onlyTechnician || audience.includes(req.user.id)) send();
     };
     updates.on('orders', changed);
     write('data: {"type":"ready"}\n\n');
@@ -422,12 +434,12 @@ export async function createApp(db) {
   app.delete('/api/orders/:id', deleteOrders);
   app.post('/api/order-deletions', deleteOrders);
   app.get('/api/orders', async (req, res) => {
+    const onlyTechnician = await isOnlyTechnician(req.user);
+    const allOrders = req.user.role === 'admin' || onlyTechnician;
     const r = await actorQuery(
-      req.user,
-      req.user.role === 'tecnico'
-        ? 'SELECT * FROM orders WHERE technician_id=$1'
-        : 'SELECT * FROM orders',
-      req.user.role === 'tecnico' ? [req.user.id] : [],
+      onlyTechnician ? { ...req.user, role: 'admin' } : req.user,
+      allOrders ? 'SELECT * FROM orders' : 'SELECT * FROM orders WHERE technician_id=$1',
+      allOrders ? [] : [req.user.id],
     );
     res.json(
       r.rows.map((r) => ({
@@ -437,10 +449,16 @@ export async function createApp(db) {
     );
   });
   app.get('/api/orders/:id/audit', async (req, res) => {
-    const r = await actorQuery(req.user, 'SELECT technician_id FROM orders WHERE id=$1', [
-      req.params.id,
-    ]);
-    if (!r.rows[0] || (req.user.role === 'tecnico' && r.rows[0].technician_id !== req.user.id))
+    const onlyTechnician = await isOnlyTechnician(req.user);
+    const r = await actorQuery(
+      onlyTechnician ? { ...req.user, role: 'admin' } : req.user,
+      'SELECT technician_id FROM orders WHERE id=$1',
+      [req.params.id],
+    );
+    if (
+      !r.rows[0] ||
+      (req.user.role === 'tecnico' && !onlyTechnician && r.rows[0].technician_id !== req.user.id)
+    )
       return res.sendStatus(404);
     res.json(
       (
@@ -460,13 +478,14 @@ export async function createApp(db) {
         return res.status(400).json({ error: 'Comando inválido.' });
       let next = orderSchema.parse({ ...data, id: orderIdentifier(data?.id) });
       const user = req.user;
+      const onlyTechnician = await isOnlyTechnician(user);
       let audience;
       const result = await serial(async () => {
         await db.exec('BEGIN');
         try {
           await db.query(
             "SELECT set_config('app.role',$1,true),set_config('app.user_id',$2,true)",
-            [user.role, user.id],
+            [onlyTechnician ? 'admin' : user.role, user.id],
           );
           if (
             (await db.query('SELECT id FROM order_deletions WHERE id=$1', [next.id])).rows.length
@@ -517,8 +536,19 @@ export async function createApp(db) {
               technicianName: technician.name,
             };
           }
-          if (prev && user.role === 'tecnico' && prev.technician_id !== user.id)
-            throw Error('OS não atribuída a você.');
+          if (prev && user.role === 'tecnico' && prev.technician_id !== user.id) {
+            if (!onlyTechnician) throw Error('OS não atribuída a você.');
+            prev.data = {
+              ...prev.data,
+              technicianId: user.id,
+              technicianName: user.name,
+            };
+            next = {
+              ...next,
+              technicianId: user.id,
+              technicianName: user.name,
+            };
+          }
           if (!prev && user.role === 'tecnico') throw Error('Somente o administrador cadastra OS.');
           if ((prev?.revision || 0) !== baseRevision) {
             await db.exec('ROLLBACK');
