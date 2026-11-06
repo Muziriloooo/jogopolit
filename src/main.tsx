@@ -723,6 +723,7 @@ function App() {
                           ? 'Continue de onde parou. Os registros são salvos automaticamente.'
                           : 'Cada visita tem seu próprio laudo, horários, fotos e assinatura.'}
                       </p>
+                      <WorkflowOverview order={current.data} />
                       {current.data.status !== 'Concluída' && (
                         <button
                           className="btn primary full"
@@ -2329,6 +2330,73 @@ function Signature({
     </div>
   );
 }
+function WorkflowOverview({ order }: { order: Order }) {
+  const active = order.visits.some((visit) => !visit.checkOut);
+  const completed = order.visits.filter((visit) => visit.checkOut).length;
+  const requested = order.parts.filter((part) => part.status === 'Solicitada').length;
+  const approved = order.parts.filter((part) => part.status === 'Aprovada').length;
+  const delivered = order.parts.filter((part) => part.status === 'Entregue').length;
+  const installed = order.parts.filter((part) => part.status === 'Instalada').length;
+  const partsLabel = delivered
+    ? delivered > 1
+      ? `${delivered} disponíveis para instalar`
+      : '1 disponível para instalar'
+    : requested
+      ? `${requested} aguardando aprovação`
+      : approved
+        ? `${approved} aguardando entrega`
+        : installed
+          ? `${installed} instalada${installed > 1 ? 's' : ''}`
+          : 'Sem solicitação';
+  const next =
+    order.status === 'Concluída'
+      ? 'Fluxo concluído. Documentos disponíveis para consulta.'
+      : !order.visits.length
+        ? 'Próximo passo: realizar o check-in e iniciar a primeira visita.'
+        : active
+          ? 'Próximo passo: concluir o laudo, registrar fotos e coletar a assinatura.'
+          : delivered
+            ? 'Próximo passo: abrir uma visita de retorno e instalar as peças entregues.'
+            : requested
+              ? 'Próximo passo: o administrador precisa analisar as peças solicitadas.'
+              : approved
+                ? 'Próximo passo: aguardar e registrar a entrega das peças.'
+                : order.visits.at(-1)?.returnNeeded
+                  ? 'Próximo passo: programar a visita de retorno.'
+                  : 'Visita concluída. O administrador pode revisar e encerrar a OS.';
+  const stages = [
+    ['Chamado', 'Recebido', true],
+    [
+      'Visita',
+      active
+        ? 'Em andamento'
+        : completed
+          ? `${completed} concluída${completed > 1 ? 's' : ''}`
+          : 'Pendente',
+      active || completed > 0,
+    ],
+    ['Peças', partsLabel, order.parts.length > 0],
+    [
+      'Conclusão',
+      order.status === 'Concluída' ? 'Encerrada' : 'OS aberta',
+      order.status === 'Concluída',
+    ],
+  ] as const;
+  return (
+    <div className="workflow-overview">
+      <div className="workflow-steps">
+        {stages.map(([label, value, done], index) => (
+          <div className={done ? 'done' : ''} key={label}>
+            <i>{done ? <Check size={13} /> : index + 1}</i>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </div>
+        ))}
+      </div>
+      <p className="workflow-next">{next}</p>
+    </div>
+  );
+}
 function Parts({
   order,
   manager,
@@ -2359,22 +2427,83 @@ function Parts({
     compatible: '',
     unitCents: 0,
   });
-  const update = (p: Part) =>
-    change({ ...order, parts: order.parts.map((x) => (x.id === p.id ? p : x)) });
+  const update = (p: Part) => {
+    const status =
+      p.status === 'Instalada' && activeVisit
+        ? 'Em andamento'
+        : p.status !== 'Instalada' && !activeVisit && order.status !== 'Concluída'
+          ? 'Aguardando peças'
+          : order.status;
+    change({ ...order, status, parts: order.parts.map((x) => (x.id === p.id ? p : x)) });
+  };
+  const stages = [
+    {
+      status: 'Solicitada' as const,
+      title: 'Aguardando aprovação',
+      description: manager
+        ? 'Confira a necessidade e aprove a compra.'
+        : 'Solicitação enviada para análise do administrador.',
+    },
+    {
+      status: 'Aprovada' as const,
+      title: 'Aguardando entrega',
+      description: manager
+        ? 'A compra foi aprovada. Registre quando a peça estiver disponível.'
+        : 'Aprovada; ainda não está disponível para instalação.',
+    },
+    {
+      status: 'Entregue' as const,
+      title: 'Disponível para instalar',
+      description: activeVisit
+        ? 'A peça pode ser instalada nesta visita.'
+        : 'Inicie ou continue uma visita para registrar a instalação.',
+    },
+    {
+      status: 'Instalada' as const,
+      title: 'Instalada no equipamento',
+      description: 'Somente estes itens aparecem como peças aplicadas no relatório.',
+    },
+  ];
+  const quantity = (status: Part['status']) =>
+    order.parts
+      .filter((item) => item.status === status)
+      .reduce((sum, item) => sum + item.quantity, 0);
+  const installedQuantity = quantity('Instalada');
+  const pendingQuantity = order.parts
+    .filter((item) => item.status !== 'Instalada')
+    .reduce((sum, item) => sum + item.quantity, 0);
   return (
     <section className="panel">
       <div className="section-heading">
         <div>
           <h2>Peças e materiais</h2>
-          <p>Solicitada → Aprovada → Entregue → Instalada</p>
+          <p>Cada peça avança por uma etapa até ser realmente instalada.</p>
         </div>
         <button className="btn primary" onClick={() => setAdding(!adding)}>
           <Plus size={17} />
-          Solicitar peça
+          Adicionar peça a solicitar
         </button>
       </div>
-      <div className="info-note">
-        Apenas peças entregues podem ser instaladas. Cada instalação pertence a uma visita.
+      <div className="parts-report-summary">
+        <div>
+          <span>Peças aplicadas</span>
+          <strong>{installedQuantity ? `${installedQuantity} un.` : 'Nenhuma'}</strong>
+          <small>Somente itens instalados</small>
+        </div>
+        <div>
+          <span>Peças solicitadas / pendentes</span>
+          <strong>{pendingQuantity ? `Sim · ${pendingQuantity} un.` : 'Não'}</strong>
+          <small>Não contam como aplicadas</small>
+        </div>
+      </div>
+      <div className="parts-flow" aria-label="Fluxo das peças">
+        {stages.map((stage, index) => (
+          <div className={quantity(stage.status) ? 'active' : ''} key={stage.status}>
+            <i>{index + 1}</i>
+            <span>{stage.status}</span>
+            <strong>{quantity(stage.status)}</strong>
+          </div>
+        ))}
       </div>
       {adding && (
         <form
@@ -2383,6 +2512,7 @@ function Parts({
             e.preventDefault();
             change({
               ...order,
+              status: activeVisit ? 'Em andamento' : 'Aguardando peças',
               parts: [...order.parts, { ...part, id: uid(), status: 'Solicitada' }],
             });
             setAdding(false);
@@ -2454,65 +2584,81 @@ function Parts({
           <button className="btn primary">Salvar solicitação</button>
         </form>
       )}
-      {order.parts.map((p) => (
-        <div className="part-card" key={p.id}>
-          <div className="part-description">
-            <span className="square-icon">
-              <Package size={22} />
-            </span>
-            <div>
-              <span className="mini-label">{p.code}</span>
-              <h3>{p.description}</h3>
-              <p>
-                {p.quantity} un. · {p.compatible || 'Compatibilidade não informada'}
-              </p>
-              <small>{p.supplier || 'Fornecedor não informado'}</small>
+      {stages.map((stage) => {
+        const rows = order.parts.filter((item) => item.status === stage.status);
+        if (!rows.length) return null;
+        return (
+          <section className="parts-stage" key={stage.status}>
+            <div className="parts-stage-heading">
+              <div>
+                <span>{stage.status}</span>
+                <h3>{stage.title}</h3>
+                <p>{stage.description}</p>
+              </div>
+              <strong>{rows.reduce((sum, item) => sum + item.quantity, 0)} un.</strong>
             </div>
-          </div>
-          <div className="part-action">
-            <Badge status={p.status} />
-            {manager && p.status === 'Solicitada' && (
-              <button className="btn" onClick={() => update({ ...p, status: 'Aprovada' })}>
-                Aprovar solicitação
-              </button>
-            )}
-            {manager && p.status === 'Aprovada' && (
-              <button className="btn" onClick={() => update({ ...p, status: 'Entregue' })}>
-                <Truck size={16} />
-                Registrar entrega
-              </button>
-            )}
-            {p.status === 'Entregue' && (
-              <button
-                className="btn"
-                disabled={!activeVisit}
-                onClick={() =>
-                  update({ ...p, status: 'Instalada', installedVisitId: activeVisit!.id })
-                }
-              >
-                <Wrench size={16} />
-                Registrar instalação
-              </button>
-            )}
-            {manager && (
-              <label className="price-input">
-                Unitário (R$)
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={(p.unitCents || 0) / 100}
-                  disabled={p.status === 'Instalada'}
-                  onChange={(e) =>
-                    update({ ...p, unitCents: Math.round(Number(e.target.value) * 100) })
-                  }
-                />
-                <b>{money(p.quantity * (p.unitCents || 0))}</b>
-              </label>
-            )}
-          </div>
-        </div>
-      ))}
+            {rows.map((p) => (
+              <div className="part-card" key={p.id}>
+                <div className="part-description">
+                  <span className="square-icon">
+                    <Package size={22} />
+                  </span>
+                  <div>
+                    <span className="mini-label">{p.code}</span>
+                    <h3>{p.description}</h3>
+                    <p>
+                      {p.quantity} un. · {p.compatible || 'Compatibilidade não informada'}
+                    </p>
+                    <small>{p.supplier || 'Fornecedor não informado'}</small>
+                  </div>
+                </div>
+                <div className="part-action">
+                  <Badge status={p.status} />
+                  {manager && p.status === 'Solicitada' && (
+                    <button className="btn" onClick={() => update({ ...p, status: 'Aprovada' })}>
+                      Aprovar peça
+                    </button>
+                  )}
+                  {manager && p.status === 'Aprovada' && (
+                    <button className="btn" onClick={() => update({ ...p, status: 'Entregue' })}>
+                      <Truck size={16} />
+                      Marcar como entregue
+                    </button>
+                  )}
+                  {p.status === 'Entregue' && (
+                    <button
+                      className="btn"
+                      disabled={!activeVisit}
+                      onClick={() =>
+                        update({ ...p, status: 'Instalada', installedVisitId: activeVisit!.id })
+                      }
+                    >
+                      <Wrench size={16} />
+                      Registrar instalação
+                    </button>
+                  )}
+                  {manager && (
+                    <label className="price-input">
+                      Unitário (R$)
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={(p.unitCents || 0) / 100}
+                        disabled={p.status === 'Instalada'}
+                        onChange={(e) =>
+                          update({ ...p, unitCents: Math.round(Number(e.target.value) * 100) })
+                        }
+                      />
+                      <b>{money(p.quantity * (p.unitCents || 0))}</b>
+                    </label>
+                  )}
+                </div>
+              </div>
+            ))}
+          </section>
+        );
+      })}
       {!order.parts.length && (
         <div className="empty">
           <Package size={38} />

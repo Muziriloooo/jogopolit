@@ -21,6 +21,7 @@ with sync_playwright() as p:
  login('tecnico@slcampo.local')
  page.set_viewport_size({'width':390,'height':844});page.screenshot(path=str(ART/'dashboard-mobile.png'),full_page=True)
  page.get_by_role('button',name=ORDER).click()
+ page.screenshot(path=str(ART/'atendimento-resumo-mobile.png'),full_page=True)
  page.get_by_role('button',name='INICIAR ATENDIMENTO',exact=True).click();expect(page.get_by_text('Check-in registrado',exact=True)).to_be_visible()
  if os.environ.get('SL_OFFLINE'):
   page.evaluate('navigator.serviceWorker.ready');context.set_offline(True)
@@ -38,7 +39,7 @@ with sync_playwright() as p:
  if os.environ.get('SL_OFFLINE'):
   page.reload();expect(page.get_by_role('heading',name='Olá,')).to_be_visible();page.get_by_role('button',name=ORDER).click();page.get_by_role('button',name='Continuar atendimento').click();page.get_by_role('button',name='Continuar',exact=True).click();expect(page.get_by_label('Diagnóstico técnico *',exact=True)).to_have_value('Desgaste identificado na inspeção');page.get_by_role('button',name='Continuar',exact=True).click();expect(page.get_by_label('Legenda da foto')).to_have_value('Equipamento após inspeção')
  page.get_by_role('button',name='Continuar',exact=True).click()
- page.locator('.detail-tabs').get_by_role('button',name='Peças',exact=True).click();page.get_by_role('button',name='Solicitar peça',exact=True).click();page.locator('.inset-form select').select_option('MT13044');page.get_by_label('Quantidade',exact=True).fill('2');page.get_by_role('button',name='Salvar solicitação').click();expect(page.get_by_text('Solicitada',exact=True)).to_be_visible();page.locator('.detail-tabs').get_by_role('button',name='Atendimento',exact=True).click()
+ page.locator('.detail-tabs').get_by_role('button',name='Peças',exact=True).click();page.get_by_role('button',name='Adicionar peça a solicitar',exact=True).click();page.locator('.inset-form select').select_option('MT13044');page.get_by_label('Quantidade',exact=True).fill('2');page.get_by_role('button',name='Salvar solicitação').click();expect(page.get_by_role('heading',name='Aguardando aprovação',exact=True)).to_be_visible();expect(page.get_by_text('Sim · 2 un.',exact=True)).to_be_visible();page.screenshot(path=str(ART/'pecas-mobile.png'),full_page=True);page.locator('.detail-tabs').get_by_role('button',name='Atendimento',exact=True).click()
  for _ in range(3):page.get_by_role('button',name='Continuar',exact=True).click()
  page.get_by_label('Nome do responsável *',exact=True).fill('Responsável fictício');page.get_by_label('Cargo *',exact=True).fill('Supervisor')
  canvas=page.locator('canvas');box=canvas.bounding_box();cdp=context.new_cdp_session(page)
@@ -53,6 +54,7 @@ with sync_playwright() as p:
  info.value.save_as(str(ART/'relatorio.pdf'));assert (ART/'relatorio.pdf').stat().st_size>5000
  pdf_text=subprocess.run(['pdftotext',str(ART/'relatorio.pdf'),'-'],check=True,capture_output=True,text=True).stdout
  assert 'SOUZA LIMA' in pdf_text and 'RELATÓRIO TÉCNICO' in pdf_text
+ assert 'Peças aplicadas: Nenhuma' in pdf_text and 'Há peças pendentes de instalação: Sim' in pdf_text
  if os.environ.get('SL_OFFLINE'):context.set_offline(False)
  page.get_by_role('button',name='Sincronizar',exact=True).click();expect(page.get_by_text('Sincronizado',exact=True)).to_be_visible(timeout=20000)
  assert not page.evaluate('document.documentElement.scrollWidth>innerWidth')

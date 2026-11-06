@@ -90,3 +90,10 @@ A remoção do banco que roda no computador do usuário ocorrerá quando essa ve
 - O teste Chromium confirmou que o painel de Peças não renderiza mais o título nem os controles de “Serviços e custos”.
 - O relatório técnico real foi gerado em duas páginas; `pdftotext` confirmou **SOUZA LIMA** e **RELATÓRIO TÉCNICO**, e a primeira página foi renderizada em PNG para inspeção visual do símbolo azul/amarelo, nome, título e faixas institucionais.
 - O mesmo cabeçalho é compartilhado pelos modelos Ordem de Serviço e Relatório Técnico e é redesenhado automaticamente em cada página nova.
+
+## Visão do atendimento e fluxo de peças
+
+- O resumo mobile mostra quatro etapas — Chamado, Visita, Peças e Conclusão — e uma orientação de próximo passo calculada a partir das visitas, retornos e peças da OS.
+- A aba Peças separa visualmente Solicitada, Aprovada, Entregue e Instalada, com quantidade em cada etapa e a ação permitida para o perfil atual.
+- Somente itens com status **Instalada** aparecem em “Peças aplicadas / quantidade”. Solicitações, aprovações e entregas permanecem em “Peças solicitadas / orçamento”, sempre com o status atual.
+- O teste Chromium solicitou duas unidades, confirmou “Peças aplicadas: Nenhuma”, “Peças solicitadas / pendentes: Sim · 2 un.” e validou a mesma separação no PDF.

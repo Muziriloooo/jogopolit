@@ -126,11 +126,11 @@ export function report(order: Order, user: User, kind: 'OS' | 'Relatório técni
     line('Mau uso', v.misuse ? 'Sim · ' + v.misuseNotes : 'Não · ' + v.misuseNotes);
     line('Retorno necessário', v.returnNeeded ? 'Sim' : 'Não');
     line('Recomendações / observações', v.notes);
-    title('Peças efetivamente instaladas nesta visita');
+    title('Peças aplicadas / quantidade');
     const installed = order.parts.filter(
       (p) => p.status === 'Instalada' && p.installedVisitId === v.id,
     );
-    if (!installed.length) line('Instalações', 'Nenhuma');
+    if (!installed.length) line('Peças aplicadas', 'Nenhuma');
     installed.forEach((p) => line(p.code, `${p.quantity} × ${p.description}`));
     if (v.photos.length) title('Fotografias do atendimento');
     for (const [index, p] of v.photos.entries()) {
@@ -155,8 +155,11 @@ export function report(order: Order, user: User, kind: 'OS' | 'Relatório técni
       y += 35;
     } else line(v.signatureMode, v.signatureReason);
   }
-  title('Solicitações e materiais');
-  for (const p of order.parts)
+  title('Peças solicitadas / orçamento');
+  const pendingParts = order.parts.filter((part) => part.status !== 'Instalada');
+  line('Há peças pendentes de instalação', pendingParts.length ? 'Sim' : 'Não');
+  if (!pendingParts.length) line('Itens pendentes', 'Nenhum');
+  for (const p of pendingParts)
     line(
       `${p.code} · ${p.status}`,
       `${p.quantity} × ${p.description}${user.role !== 'tecnico' ? ' · ' + money(p.quantity * (p.unitCents || 0)) : ''}`,

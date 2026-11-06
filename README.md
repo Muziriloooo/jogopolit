@@ -65,6 +65,8 @@ Capturas e PDF ficam em `test-results/` (ignorado). Os testes não alteram a OS 
 5. Administrador aprova e registra entrega. Em nova visita, técnico instala peças entregues e registra resultados.
 6. Administrador encerra a OS sem pendências. Para conflito de edição, exporte o rascunho antes de carregar a versão do servidor.
 
+O resumo da OS apresenta **Chamado → Visita → Peças → Conclusão** e informa o próximo passo. Em Peças, cada item percorre **Solicitada → Aprovada → Entregue → Instalada**. Somente a última etapa conta como peça aplicada; os demais itens aparecem como pendentes com o status atual, tanto na tela quanto no relatório.
+
 ## Publicação
 
 1. Provisione PostgreSQL 15+ e um usuário de migração. Execute `server/schema.sql` com o proprietário. Crie um papel API com senha própria e permissões SELECT/INSERT/UPDATE/DELETE nas tabelas e USAGE/SELECT nas sequências; sem SUPERUSER, propriedade das tabelas ou BYPASSRLS. Não exponha PostgreSQL na internet sem restrições. O bootstrap de schema é idempotente; em instalações com papel restrito, aplique migrações separadamente e configure `SKIP_SCHEMA=true` para o processo de aplicação.
