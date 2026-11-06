@@ -6,13 +6,76 @@ export const date = (s?: string) =>
   s ? new Date(s).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '—';
 export function report(order: Order, user: User, kind: 'OS' | 'Relatório técnico', visit?: Visit) {
   const pdf = new jsPDF();
-  let y = 20;
+  let y = 46;
   const width = 174;
+  const polygon = (points: [number, number][], color: [number, number, number]) => {
+    pdf.setFillColor(...color);
+    pdf.lines(
+      points.slice(1).map(([x, y], index) => [x - points[index][0], y - points[index][1]]),
+      points[0][0],
+      points[0][1],
+      [1, 1],
+      'F',
+      true,
+    );
+  };
+  const logo = () => {
+    polygon(
+      [
+        [9, 11],
+        [19, 17],
+        [29, 23],
+        [19, 29],
+        [9, 23],
+      ],
+      [255, 190, 0],
+    );
+    polygon(
+      [
+        [19, 4],
+        [29, 10],
+        [29, 20],
+        [19, 14],
+        [9, 9],
+      ],
+      [24, 57, 195],
+    );
+    pdf.setDrawColor(255, 255, 255);
+    pdf.setLineWidth(1.1);
+    pdf.line(13, 9.5, 25, 16.5);
+    pdf.line(13, 14, 20.5, 18.5);
+    pdf.setTextColor(0, 27, 128);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(18);
+    pdf.text('SOUZA LIMA', 34, 17);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.text('SL CAMPO · MANUTENÇÃO', 34, 25);
+  };
+  const header = () => {
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, 210, 39, 'F');
+    logo();
+    pdf.setTextColor(0, 27, 128);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(11);
+    pdf.text(kind.toUpperCase(), 195, 14, { align: 'right' });
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.text(`ORDEM ${order.id}`, 195, 22, { align: 'right' });
+    pdf.setFillColor(0, 27, 128);
+    pdf.rect(0, 33, 210, 4, 'F');
+    pdf.setFillColor(255, 190, 0);
+    pdf.rect(0, 37, 210, 2, 'F');
+    pdf.setTextColor(30);
+    y = 47;
+  };
   const page = () => {
     pdf.addPage();
-    y = 20;
+    header();
   };
   const line = (label: string, value: unknown) => {
+    pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(10);
     const lines = pdf.splitTextToSize(`${label}: ${value ?? '—'}`, width);
     for (const l of lines) {
@@ -36,17 +99,7 @@ export function report(order: Order, user: User, kind: 'OS' | 'Relatório técni
     : user.role === 'tecnico'
       ? user.name
       : order.technicianId;
-  pdf.setFillColor(0, 27, 128);
-  pdf.rect(0, 0, 210, 35, 'F');
-  pdf.setFillColor(255, 190, 0);
-  pdf.rect(0, 35, 210, 2, 'F');
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(20);
-  pdf.text('SL CAMPO', 18, 17);
-  pdf.setFontSize(10);
-  pdf.text('GRUPO SOUZA LIMA | ' + kind.toUpperCase(), 18, 26);
-  pdf.setTextColor(30);
-  y = 46;
+  header();
   line('Ordem de serviço', order.id + ' · ' + order.status);
   line('Cliente / unidade', order.client + ' / ' + order.unit);
   line('Endereço', order.address);

@@ -2520,53 +2520,6 @@ function Parts({
           <p>Use o catálogo ou cadastre um produto manualmente.</p>
         </div>
       )}
-      {manager && (
-        <div className="cost-summary">
-          <h2>Serviços e custos</h2>
-          <div className="form-grid">
-            {(['laborCents', 'travelCents', 'extraCents'] as const).map((k, i) => (
-              <label key={k}>
-                {['Mão de obra (R$)', 'Deslocamento (R$)', 'Custos adicionais (R$)'][i]}
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={(order[k] || 0) / 100}
-                  onChange={(e) =>
-                    change({ ...order, [k]: Math.round(Number(e.target.value) * 100) })
-                  }
-                />
-              </label>
-            ))}
-          </div>
-          <div className="total-line">
-            <span>
-              Total de peças <small>inclui solicitações</small>
-            </span>
-            <b>{money(order.parts.reduce((a, p) => a + p.quantity * (p.unitCents || 0), 0))}</b>
-          </div>
-          <div className="total-line">
-            <span>Serviços e deslocamento</span>
-            <b>
-              {money((order.laborCents || 0) + (order.travelCents || 0) + (order.extraCents || 0))}
-            </b>
-          </div>
-          <div className="total-line grand">
-            <span>Total registrado</span>
-            <b>
-              {money(
-                order.parts.reduce((a, p) => a + p.quantity * (p.unitCents || 0), 0) +
-                  (order.laborCents || 0) +
-                  (order.travelCents || 0) +
-                  (order.extraCents || 0),
-              )}
-            </b>
-          </div>
-          <p>
-            {order.referenceNote || 'Valores não constituem aprovação de orçamento ou faturamento.'}
-          </p>
-        </div>
-      )}
     </section>
   );
 }

@@ -84,3 +84,9 @@ A remoção do banco que roda no computador do usuário ocorrerá quando essa ve
 - Com dois técnicos ativos, os testes de isolamento continuam confirmando que um técnico não vê nem altera a OS do outro.
 - A manutenção remove a conta demonstrativa antiga `tec-demo` (Lucas), revoga sua sessão e transfere suas OS para `tec-teste`, preservando o conteúdo dos atendimentos.
 - `npm test` passou com 37 casos, incluindo chamado sem PDF atribuído ao administrador, recebimento pelo único técnico, remoção de Lucas e atualização persistente de `technician_id`.
+
+## Logo nos PDFs e remoção de Serviços e custos
+
+- O teste Chromium confirmou que o painel de Peças não renderiza mais o título nem os controles de “Serviços e custos”.
+- O relatório técnico real foi gerado em duas páginas; `pdftotext` confirmou **SOUZA LIMA** e **RELATÓRIO TÉCNICO**, e a primeira página foi renderizada em PNG para inspeção visual do símbolo azul/amarelo, nome, título e faixas institucionais.
+- O mesmo cabeçalho é compartilhado pelos modelos Ordem de Serviço e Relatório Técnico e é redesenhado automaticamente em cada página nova.

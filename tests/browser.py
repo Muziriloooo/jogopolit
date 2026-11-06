@@ -1,4 +1,4 @@
-import os,json,uuid
+import os,json,subprocess,uuid
 from pathlib import Path
 from playwright.sync_api import sync_playwright,expect
 from pdf_fixture import make_internal_pdf
@@ -15,6 +15,7 @@ with sync_playwright() as p:
  page.screenshot(path=str(ART/'dashboard-desktop.png'),full_page=True)
  source_pdf=make_internal_pdf(ART/'chamado-interno.pdf',ORDER,'Cliente de teste','Unidade de teste','Lavadora de teste')
  page.get_by_role('button',name='Importar chamado').click();page.get_by_label('PDF do chamado interno').set_input_files(str(source_pdf));expect(page.get_by_role('heading',name='Chamado #'+ORDER)).to_be_visible();page.get_by_role('button',name='Criar atendimento pelo PDF').click();expect(page.get_by_role('heading',name='Ordem de serviço')).to_be_visible()
+ page.locator('.detail-tabs').get_by_role('button',name='Peças',exact=True).click();assert page.get_by_role('heading',name='Serviços e custos',exact=True).count()==0
  page.get_by_role('button',name='Sincronizar',exact=True).click();expect(page.get_by_text('Sincronizado',exact=True)).to_be_visible(timeout=15000)
  page.get_by_role('button',name='Administrador').click();expect(page.get_by_role('heading',name='Vamos ao trabalho?')).to_be_visible()
  login('tecnico@slcampo.local')
@@ -50,6 +51,8 @@ with sync_playwright() as p:
  expect(page.get_by_role('button',name='Abrir PDF interno',exact=True)).to_be_visible()
  with page.expect_download() as info:page.get_by_role('button',name='Baixar PDF').nth(1).click()
  info.value.save_as(str(ART/'relatorio.pdf'));assert (ART/'relatorio.pdf').stat().st_size>5000
+ pdf_text=subprocess.run(['pdftotext',str(ART/'relatorio.pdf'),'-'],check=True,capture_output=True,text=True).stdout
+ assert 'SOUZA LIMA' in pdf_text and 'RELATÓRIO TÉCNICO' in pdf_text
  if os.environ.get('SL_OFFLINE'):context.set_offline(False)
  page.get_by_role('button',name='Sincronizar',exact=True).click();expect(page.get_by_text('Sincronizado',exact=True)).to_be_visible(timeout=20000)
  assert not page.evaluate('document.documentElement.scrollWidth>innerWidth')

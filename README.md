@@ -92,6 +92,8 @@ PGlite local: pare a API antes de copiar `.data/postgres` integralmente; restaur
 
 A marca vetorial foi reconstruída a partir da identidade visual enviada pelo usuário. Para fidelidade exata, substitua pelo arquivo oficial autorizado. Cores, faixas diagonais, ícones e PDFs seguem a referência azul, amarela e branca.
 
+Os dois PDFs gerados exibem o símbolo azul/amarelo e o nome **SOUZA LIMA** no cabeçalho de todas as páginas. A área administrativa de Peças não exibe mais o bloco “Serviços e custos”; os campos históricos continuam compatíveis no banco e nos documentos existentes.
+
 ## Atualização pela rede local (localhost e IP do computador)
 
 Este é o modo usado por `iniciar.bat`: computador em `http://localhost:5173/` e celular em `http://IP-DO-COMPUTADOR:5173/`, no mesmo Wi-Fi. A API e o banco são os do computador; não execute um segundo banco no celular.
